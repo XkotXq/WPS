@@ -1,0 +1,114 @@
+{
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Warehouse Management System",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@company.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "••••••••",
+    "rememberMe": "Remember me",
+    "submit": "Log in",
+    "demoNote": "Preview mode — no credentials required, click Log in to continue."
+  },
+  "nav": {
+    "home": "Home",
+    "stock": "Stock",
+    "currentStock": "Current Stock",
+    "previousStocks": "Previous Stocks",
+    "balance": "Balance",
+    "reports": "Reports",
+    "frpDatabase": "FRP Database",
+    "materials": "Materials",
+    "materialsList": "Materials List",
+    "search": "Search",
+    "searchPlaceholder": "Search...",
+    "collapse": "Collapse navigation",
+    "expand": "Expand navigation",
+    "closeTab": "Close tab"
+  },
+  "dashboard": {
+    "welcomeTitle": "Welcome back",
+    "welcomeSubtitle": "This is a preview of the dashboard. More sections will be added soon.",
+    "logout": "Log out"
+  },
+  "stock": {
+    "title": "Current Stock",
+    "asOfDate": "Stock as of: {date}",
+    "tabs": {
+      "frp": "FRP",
+      "coatedFrp": "Coated FRP",
+      "filler": "FILLER"
+    },
+    "export": {
+      "button": "Export stock",
+      "cipButton": "Export to CIP",
+      "selectMaterials": "Select materials",
+      "confirm": "Confirm"
+    },
+    "columns": {
+      "item": "Item number",
+      "color": "Color",
+      "diameter": "Diameter",
+      "length": "Length (km)",
+      "lengthPlain": "Length",
+      "xbz": "XB/Z",
+      "spoolNumber": "Spool No.",
+      "flameRetardant": "Flame retardant",
+      "location": "Location",
+      "note": "Note",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "selectedCount": "{count} of {total} selected",
+    "clearSelection": "Clear selection",
+    "actions": {
+      "moreActions": "More actions",
+      "inOrderRail": "In order rail"
+    },
+    "filters": {
+      "title": "Filters",
+      "searchPlaceholder": "Search all columns (min. 3 characters)...",
+      "search": "Search",
+      "advanced": "More filters",
+      "item": "Item",
+      "diameter": "Diameter",
+      "xbz": "XB/Z",
+      "mmc": "MMC",
+      "spoolNumber": "Spool No.",
+      "location": "Location",
+      "lengthMin": "Min length",
+      "lengthMax": "Max length",
+      "apply": "Filter",
+      "reset": "Clear filters"
+    }
+  },
+  "stockPrevious": {
+    "title": "Previous Stocks",
+    "subtitle": "Historical stock levels will be shown here. This section is coming soon."
+  },
+  "stockBalance": {
+    "title": "Balance",
+    "subtitle": "The stock balance will be shown here. This section is coming soon."
+  },
+  "stockReports": {
+    "title": "Reports",
+    "subtitle": "Stock reports will be shown here. This section is coming soon."
+  },
+  "stockFrpDatabase": {
+    "title": "FRP Database",
+    "subtitle": "The FRP database will be shown here. This section is coming soon."
+  },
+  "materialsList": {
+    "title": "Materials List",
+    "subtitle": "The materials list will be managed here. This section is coming soon."
+  },
+  "materialsReports": {
+    "title": "Reports",
+    "subtitle": "Materials reports will be shown here. This section is coming soon."
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "login": {
+    "title": "Zaloguj się",
+    "subtitle": "System Zarządzania Magazynem",
+    "emailLabel": "Adres e-mail",
+    "emailPlaceholder": "ty@firma.pl",
+    "passwordLabel": "Hasło",
+    "passwordPlaceholder": "••••••••",
+    "rememberMe": "Zapamiętaj mnie",
+    "submit": "Zaloguj się",
+    "demoNote": "Tryb podglądu — dane logowania nie są wymagane, kliknij „Zaloguj się”, aby przejść dalej."
+  },
+  "nav": {
+    "home": "Strona główna",
+    "stock": "Stock",
+    "currentStock": "Aktualny stock",
+    "previousStocks": "Poprzednie stocki",
+    "balance": "Bilans",
+    "reports": "Raporty",
+    "frpDatabase": "Baza FRP",
+    "materials": "Materiały",
+    "materialsList": "Lista materiałów",
+    "search": "Szukaj",
+    "searchPlaceholder": "Szukaj...",
+    "collapse": "Zwiń nawigację",
+    "expand": "Rozwiń nawigację",
+    "closeTab": "Zamknij kartę"
+  },
+  "dashboard": {
+    "welcomeTitle": "Witaj ponownie",
+    "welcomeSubtitle": "To jest podgląd panelu. Kolejne sekcje zostaną dodane wkrótce.",
+    "logout": "Wyloguj się"
+  },
+  "stock": {
+    "title": "Aktualny stock",
+    "asOfDate": "Stan na dzień: {date}",
+    "tabs": {
+      "frp": "FRP",
+      "coatedFrp": "Coated FRP",
+      "filler": "FILLER"
+    },
+    "export": {
+      "button": "Eksportuj stock",
+      "cipButton": "Eksportuj do CIP",
+      "selectMaterials": "Wybierz materiały",
+      "confirm": "Potwierdź"
+    },
+    "columns": {
+      "item": "Item number",
+      "color": "Kolor",
+      "diameter": "Średnica",
+      "length": "Długość (km)",
+      "lengthPlain": "Długość",
+      "xbz": "XB/Z",
+      "spoolNumber": "Nr szpuli",
+      "flameRetardant": "Niepalny",
+      "location": "Lokalizacja",
+      "note": "Notatka",
+      "yes": "Tak",
+      "no": "Nie"
+    },
+    "selectedCount": "Zaznaczono {count} z {total}",
+    "clearSelection": "Wyczyść zaznaczenie",
+    "actions": {
+      "moreActions": "Więcej akcji",
+      "inOrderRail": "W szynie do zamówień"
+    },
+    "filters": {
+      "title": "Filtry",
+      "searchPlaceholder": "Szukaj we wszystkich kolumnach (min. 3 znaki)...",
+      "search": "Szukaj",
+      "advanced": "Więcej filtrów",
+      "item": "Item",
+      "diameter": "Średnica",
+      "xbz": "XB/Z",
+      "mmc": "MMC",
+      "spoolNumber": "Nr szpuli",
+      "location": "Lokalizacja",
+      "lengthMin": "Dł. min",
+      "lengthMax": "Dł. max",
+      "apply": "Filtruj",
+      "reset": "Wyczyść filtry"
+    }
+  },
+  "stockPrevious": {
+    "title": "Poprzednie stocki",
+    "subtitle": "Tutaj pojawi się historia stanów magazynowych. Ta sekcja jest w przygotowaniu."
+  },
+  "stockBalance": {
+    "title": "Bilans",
+    "subtitle": "Tutaj pojawi się bilans magazynowy. Ta sekcja jest w przygotowaniu."
+  },
+  "stockReports": {
+    "title": "Raporty",
+    "subtitle": "Tutaj pojawią się raporty magazynowe. Ta sekcja jest w przygotowaniu."
+  },
+  "stockFrpDatabase": {
+    "title": "Baza FRP",
+    "subtitle": "Tutaj pojawi się baza danych FRP. Ta sekcja jest w przygotowaniu."
+  },
+  "materialsList": {
+    "title": "Lista materiałów",
+    "subtitle": "Tutaj będzie zarządzana lista materiałów. Ta sekcja jest w przygotowaniu."
+  },
+  "materialsReports": {
+    "title": "Raporty",
+    "subtitle": "Tutaj pojawią się raporty materiałowe. Ta sekcja jest w przygotowaniu."
+  },
+  "theme": {
+    "light": "Jasny",
+    "dark": "Ciemny",
+    "system": "Systemowy"
+  }
+}
