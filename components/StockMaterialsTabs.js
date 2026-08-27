@@ -9,20 +9,13 @@ import { Button } from "@/components/ui/button";
 import MaterialsTable from "@/components/MaterialsTable";
 import FrpFilters from "@/components/FrpFilters";
 import ExportStockMenu from "@/components/ExportStockMenu";
-import {
-  frpMaterials,
-  coatedFrpMaterials,
-  fillerMaterials,
-  frpColumns,
-  coatedFrpColumns,
-  fillerColumns,
-} from "@/lib/materials-data";
+import { frpColumns, coatedFrpColumns, fillerColumns } from "@/lib/materials-data";
 
 const MATERIAL_PARAM = "material";
 const VALID_MATERIALS = ["frp", "coatedFrp", "filler"];
 const DEFAULT_MATERIAL = "frp";
 
-export default function StockMaterialsTabs() {
+export default function StockMaterialsTabs({ frpItems, coatedFrpItems, fillerItems }) {
   const t = useTranslations("stock.tabs");
   const tExport = useTranslations("stock.export");
   const router = useRouter();
@@ -71,7 +64,7 @@ export default function StockMaterialsTabs() {
       <TabsContent value="frp" className="mt-4">
         <FrpFilters onGlobalFilterChange={setFrpSearch} />
         <MaterialsTable
-          data={frpMaterials}
+          data={frpItems}
           columns={frpColumns}
           globalFilter={frpSearch}
           onGlobalFilterChange={setFrpSearch}
@@ -79,10 +72,10 @@ export default function StockMaterialsTabs() {
         />
       </TabsContent>
       <TabsContent value="coatedFrp" className="mt-4">
-        <MaterialsTable data={coatedFrpMaterials} columns={coatedFrpColumns} />
+        <MaterialsTable data={coatedFrpItems} columns={coatedFrpColumns} />
       </TabsContent>
       <TabsContent value="filler" className="mt-4">
-        <MaterialsTable data={fillerMaterials} columns={fillerColumns} />
+        <MaterialsTable data={fillerItems} columns={fillerColumns} />
       </TabsContent>
     </Tabs>
   );

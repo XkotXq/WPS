@@ -13,7 +13,7 @@
   "nav": {
     "home": "Strona główna",
     "stock": "Stock",
-    "currentStock": "Aktualny stock",
+    "currentStock": "Stock",
     "previousStocks": "Poprzednie stocki",
     "balance": "Bilans",
     "reports": "Raporty",
@@ -32,8 +32,11 @@
     "logout": "Wyloguj się"
   },
   "stock": {
-    "title": "Aktualny stock",
+    "title": "Stock",
     "asOfDate": "Stan na dzień: {date}",
+    "pickDate": "Wybierz datę",
+    "noSession": "Nie zakończono jeszcze żadnego remanentu.",
+    "fetchError": "Nie udało się pobrać danych stocku z API.",
     "tabs": {
       "frp": "FRP",
       "coatedFrp": "Coated FRP",
@@ -46,6 +49,7 @@
       "confirm": "Potwierdź"
     },
     "columns": {
+      "lp": "Lp.",
       "item": "Item number",
       "color": "Kolor",
       "diameter": "Średnica",
@@ -69,13 +73,9 @@
       "title": "Filtry",
       "searchPlaceholder": "Szukaj we wszystkich kolumnach (min. 3 znaki)...",
       "search": "Szukaj",
-      "advanced": "Więcej filtrów",
-      "item": "Item",
-      "diameter": "Średnica",
-      "xbz": "XB/Z",
-      "mmc": "MMC",
-      "spoolNumber": "Nr szpuli",
-      "location": "Lokalizacja",
+      "sortAsc": "Sortuj rosnąco (A→Z)",
+      "sortDesc": "Sortuj malejąco (Z→A)",
+      "sortClear": "Wyczyść sortowanie",
       "lengthMin": "Dł. min",
       "lengthMax": "Dł. max",
       "apply": "Filtruj",

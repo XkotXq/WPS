@@ -13,7 +13,7 @@
   "nav": {
     "home": "Home",
     "stock": "Stock",
-    "currentStock": "Current Stock",
+    "currentStock": "Stock",
     "previousStocks": "Previous Stocks",
     "balance": "Balance",
     "reports": "Reports",
@@ -32,8 +32,11 @@
     "logout": "Log out"
   },
   "stock": {
-    "title": "Current Stock",
+    "title": "Stock",
     "asOfDate": "Stock as of: {date}",
+    "pickDate": "Pick a date",
+    "noSession": "No stock-take has been completed yet.",
+    "fetchError": "Failed to fetch stock data from the API.",
     "tabs": {
       "frp": "FRP",
       "coatedFrp": "Coated FRP",
@@ -46,6 +49,7 @@
       "confirm": "Confirm"
     },
     "columns": {
+      "lp": "No.",
       "item": "Item number",
       "color": "Color",
       "diameter": "Diameter",
@@ -69,13 +73,9 @@
       "title": "Filters",
       "searchPlaceholder": "Search all columns (min. 3 characters)...",
       "search": "Search",
-      "advanced": "More filters",
-      "item": "Item",
-      "diameter": "Diameter",
-      "xbz": "XB/Z",
-      "mmc": "MMC",
-      "spoolNumber": "Spool No.",
-      "location": "Location",
+      "sortAsc": "Sort ascending (A→Z)",
+      "sortDesc": "Sort descending (Z→A)",
+      "sortClear": "Clear sorting",
       "lengthMin": "Min length",
       "lengthMax": "Max length",
       "apply": "Filter",

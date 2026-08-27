@@ -5,9 +5,15 @@ import {
   columnFilteringFeature,
   createColumnHelper,
   createFilteredRowModel,
+  createSortedRowModel,
+  filterFn_equals,
   filterFn_includesString,
+  filterFn_inNumberRange,
+  filterFn_weakEquals,
   globalFilteringFeature,
   rowSelectionFeature,
+  rowSortingFeature,
+  sortFn_alphanumeric,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
@@ -15,6 +21,7 @@ import { useTranslations } from "next-intl";
 import { MoreVertical } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import ColumnFilterHeader from "@/components/ColumnFilterHeader";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -34,9 +41,18 @@ const features = tableFeatures({
   rowSelectionFeature,
   columnFilteringFeature,
   globalFilteringFeature,
+  rowSortingFeature,
   filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel(),
 });
 const columnHelper = createColumnHelper();
+
+const COLUMN_FILTER_FNS = {
+  includesString: filterFn_includesString,
+  inNumberRange: filterFn_inNumberRange,
+  weakEquals: filterFn_weakEquals,
+  equals: filterFn_equals,
+};
 
 function BooleanCell({ value }) {
   const tColumns = useTranslations("stock.columns");
@@ -66,6 +82,8 @@ export default function MaterialsTable({
   const [internalGlobalFilter, setInternalGlobalFilter] = useState("");
   const globalFilter = controlledGlobalFilter ?? internalGlobalFilter;
   const setGlobalFilter = controlledSetGlobalFilter ?? setInternalGlobalFilter;
+  const [columnFilters, setColumnFilters] = useState([]);
+  const [sorting, setSorting] = useState([]);
   const [orderRailFlags, setOrderRailFlags] = useState({});
 
   function setInOrderRail(rowId, value) {
@@ -96,6 +114,8 @@ export default function MaterialsTable({
           ...(column.type === "boolean" && {
             cell: ({ getValue }) => <BooleanCell value={getValue()} />,
           }),
+          ...(column.filterFn && { filterFn: COLUMN_FILTER_FNS[column.filterFn] }),
+          ...(column.sortable && { sortFn: sortFn_alphanumeric }),
         })
       ),
       ...(showOrderRailAction
@@ -146,58 +166,81 @@ export default function MaterialsTable({
       data,
       columns,
       getRowId: (row) => row.id,
-      state: { globalFilter },
+      state: { globalFilter, columnFilters, sorting },
       onGlobalFilterChange: setGlobalFilter,
+      onColumnFiltersChange: setColumnFilters,
+      onSortingChange: setSorting,
       globalFilterFn: filterFn_includesString,
     },
-    (state) => ({ rowSelection: state.rowSelection, globalFilter: state.globalFilter })
+    (state) => ({
+      rowSelection: state.rowSelection,
+      globalFilter: state.globalFilter,
+      columnFilters: state.columnFilters,
+      sorting: state.sorting,
+    })
   );
 
   const selectedCount = Object.keys(table.state.rowSelection).length;
 
   return (
     <div>
-      <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-neutral-800">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow
-                key={headerGroup.id}
-                className="border-none bg-navy-950 dark:bg-navy-500 hover:bg-navy-950 dark:hover:bg-navy-500"
-              >
-                {headerGroup.headers.map((header) => (
+      <Table containerClassName="max-h-[60vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-neutral-800">
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow
+              key={headerGroup.id}
+              className="border-none bg-navy-950 dark:bg-navy-500 hover:bg-navy-950 dark:hover:bg-navy-500"
+            >
+              {headerGroup.headers.map((header) => {
+                const config = columnConfig.find((c) => c.key === header.column.id);
+                return (
                   <TableHead
                     key={header.id}
-                    className="h-11 px-4 text-sm font-semibold text-white"
+                    className="sticky top-0 z-10 h-11 bg-navy-950 px-4 text-sm font-semibold text-white dark:bg-navy-500"
                   >
-                    <table.FlexRender header={header} />
+                    {config?.filterFn ? (
+                      <ColumnFilterHeader
+                        column={header.column}
+                        label={tColumns(config.headerKey)}
+                        variant={
+                          config.type === "boolean"
+                            ? "boolean"
+                            : config.filterFn === "inNumberRange"
+                            ? "range"
+                            : "text"
+                        }
+                        sortable={Boolean(config.sortable)}
+                      />
+                    ) : (
+                      <table.FlexRender header={header} />
+                    )}
                   </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row, index) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() ? "selected" : undefined}
-                className={`border-gray-100 dark:border-neutral-800 ${
-                  index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : ""
-                } data-[state=selected]:bg-navy-50 dark:data-[state=selected]:bg-navy-950/40 hover:bg-navy-50/60 dark:hover:bg-neutral-800/60`}
-              >
-                {row.getAllCells().map((cell) => (
-                  <TableCell
-                    key={cell.id}
-                    className="px-4 py-2.5 text-gray-700 dark:text-neutral-300"
-                  >
-                    <table.FlexRender cell={cell} />
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row, index) => (
+            <TableRow
+              key={row.id}
+              data-state={row.getIsSelected() ? "selected" : undefined}
+              className={`border-gray-100 dark:border-neutral-800 ${
+                index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : ""
+              } data-[state=selected]:bg-navy-50 dark:data-[state=selected]:bg-navy-950/40 hover:bg-navy-50/60 dark:hover:bg-neutral-800/60`}
+            >
+              {row.getAllCells().map((cell) => (
+                <TableCell
+                  key={cell.id}
+                  className="px-4 py-2.5 text-gray-700 dark:text-neutral-300"
+                >
+                  <table.FlexRender cell={cell} />
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <span className="text-gray-500 dark:text-neutral-400">
