@@ -82,9 +82,20 @@
     },
     "selectedCount": "{count} of {total} selected",
     "clearSelection": "Clear selection",
+    "showSelectedOnly": "Show selected only",
+    "showAll": "Show all",
+    "empty": {
+      "loading": "Loading data…",
+      "loadError": "Failed to fetch data: {error}",
+      "noData": "No items.",
+      "filtered": "No results for the selected filters."
+    },
     "actions": {
       "moreActions": "More actions",
-      "inOrderRail": "In order rail"
+      "inOrderRail": "In order rail",
+      "showSimplified": "Show simplified value",
+      "showFull": "Show full name",
+      "columns": "Columns"
     },
     "filters": {
       "title": "Filters",
@@ -104,7 +115,7 @@
     }
   },
   "stockCheck": {
-    "title": "Check Stock — {material}",
+    "title": "Check Stock - {material}",
     "fetchError": "Failed to fetch check data from the API.",
     "summary": "Marked present: {found} of {total} (missing: {missing})",
     "finish": "Finish check",
@@ -144,7 +155,7 @@
   },
   "stockReports": {
     "title": "Reports",
-    "subtitle": "Pick a stock date and material to see a report.",
+    "subtitle": "Pick a material to see a report.",
     "fetchError": "Failed to fetch data from the API.",
     "noSession": "No stock-take has been completed yet.",
     "trendTitle": "Total length ({material}) across stocks",
@@ -156,8 +167,11 @@
     "colorBlack": "Black",
     "breakdownTitle": "{material} by item",
     "clickItemHint": "Click a row to see that item's trend",
-    "itemTrendTitle": "{item} — recent stocks",
-    "columnItem": "Item",
+    "itemTrendTitle": "{item} - recent stocks",
+    "columnItem": "Item number",
+    "columnDiameter": "Diameter",
+    "columnXbz": "XB/Z",
+    "columnColor": "Color",
     "columnDelta": "Δ"
   },
   "stockFrpDatabase": {

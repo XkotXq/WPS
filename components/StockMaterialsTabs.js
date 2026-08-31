@@ -19,6 +19,8 @@ export default function StockMaterialsTabs({ frpItems, coatedFrpItems, fillerIte
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [frpSearch, setFrpSearch] = useState("");
+  const [coatedFrpSearch, setCoatedFrpSearch] = useState("");
+  const [fillerSearch, setFillerSearch] = useState("");
 
   const requestedMaterial = searchParams.get(MATERIAL_PARAM);
   const activeMaterial = VALID_MATERIALS.includes(requestedMaterial)
@@ -65,10 +67,22 @@ export default function StockMaterialsTabs({ frpItems, coatedFrpItems, fillerIte
         />
       </TabsContent>
       <TabsContent value="coatedFrp" className="mt-4">
-        <MaterialsTable data={coatedFrpItems} columns={coatedFrpColumns} />
+        <FrpFilters onGlobalFilterChange={setCoatedFrpSearch} />
+        <MaterialsTable
+          data={coatedFrpItems}
+          columns={coatedFrpColumns}
+          globalFilter={coatedFrpSearch}
+          onGlobalFilterChange={setCoatedFrpSearch}
+        />
       </TabsContent>
       <TabsContent value="filler" className="mt-4">
-        <MaterialsTable data={fillerItems} columns={fillerColumns} />
+        <FrpFilters onGlobalFilterChange={setFillerSearch} />
+        <MaterialsTable
+          data={fillerItems}
+          columns={fillerColumns}
+          globalFilter={fillerSearch}
+          onGlobalFilterChange={setFillerSearch}
+        />
       </TabsContent>
     </Tabs>
   );

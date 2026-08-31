@@ -25,7 +25,7 @@ const optionButtonClasses = (active) =>
   }`;
 
 // Lets a user click a filterable column's header to open a small popover
-// with sorting (asc/desc) and a filter input for just that column — a
+// with sorting (asc/desc) and a filter input for just that column - a
 // quicker alternative to the "More filters" panel, driven by the same
 // TanStack column-filter/sorting state, so every UI stays in sync.
 export default function ColumnFilterHeader({ column, label, variant = "text", sortable = false, options }) {
@@ -96,7 +96,7 @@ export default function ColumnFilterHeader({ column, label, variant = "text", so
           </button>
         }
       />
-      <PopoverContent align="start" className="w-56">
+      <PopoverContent align="start" className={variant === "multiselect" ? "w-72" : "w-56"}>
         {sortable && (
           <div className="flex items-center gap-1 border-b border-gray-200 dark:border-neutral-700 pb-2">
             <button
@@ -183,10 +183,10 @@ export default function ColumnFilterHeader({ column, label, variant = "text", so
                 {visibleOptions.map((value) => (
                   <label
                     key={value}
-                    className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm text-gray-700 hover:bg-gray-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                    className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 text-sm text-gray-700 hover:bg-gray-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
                   >
-                    <Checkbox checked={draft.includes(value)} onCheckedChange={() => toggleOption(value)} />
-                    <span className="truncate">{value}</span>
+                    <Checkbox checked={draft.includes(value)} onCheckedChange={() => toggleOption(value)} className="mt-0.5" />
+                    <span className="break-words">{value}</span>
                   </label>
                 ))}
                 {visibleOptions.length === 0 && (

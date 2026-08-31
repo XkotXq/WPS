@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 
 // Wraps the material tabs + "Eksportuj do CIP" button together with the
 // table below so the button can react to the table's own row-selection
-// state — the export/tabs row and the table live in a server component
+// state - the export/tabs row and the table live in a server component
 // (current/page.js) otherwise, so this state has to be held together on
 // the client side.
 export default function CurrentListWithExport({ material, items, columns }) {
@@ -18,7 +18,7 @@ export default function CurrentListWithExport({ material, items, columns }) {
   const hasSelection = Object.keys(selection).length > 0;
 
   // Row ids (and their checkboxes) belong to whichever material's table is
-  // currently mounted — a stale selection from before a material switch
+  // currently mounted - a stale selection from before a material switch
   // must not keep the button enabled for a table that shows nothing checked.
   useEffect(() => {
     setSelection({});

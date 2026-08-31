@@ -42,7 +42,7 @@ export default function DashboardLayout({ children }) {
   // Tracks true most-recently-visited order (separate from `recentPaths`,
   // which is the tab bar's visual/insertion order and only reorders via
   // drag) so closing the active tab can jump to the tab you were on before
-  // it, like a browser — not just the next one in the visual list.
+  // it, like a browser - not just the next one in the visual list.
   const mruRef = useRef([]);
 
   useEffect(() => {
@@ -98,8 +98,8 @@ export default function DashboardLayout({ children }) {
   ];
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-neutral-950 p-2 md:p-4">
-      <div className="flex h-[calc(100vh-2rem)] md:h-[calc(100vh-3rem)] w-full overflow-hidden rounded-[28px] bg-white dark:bg-neutral-900 shadow-lg shadow-gray-200/60 dark:shadow-none dark:border dark:border-neutral-800">
+    <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-neutral-950">
+      <div className="flex h-full w-full overflow-hidden bg-white dark:bg-neutral-900">
         <aside
           className={`flex shrink-0 flex-col border-r border-gray-200 dark:border-neutral-800 p-4 transition-[width] duration-200 ${
             collapsed ? "w-[76px]" : "w-64"

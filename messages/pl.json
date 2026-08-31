@@ -82,9 +82,20 @@
     },
     "selectedCount": "Zaznaczono {count} z {total}",
     "clearSelection": "Wyczyść zaznaczenie",
+    "showSelectedOnly": "Pokaż tylko zaznaczone",
+    "showAll": "Pokaż wszystkie",
+    "empty": {
+      "loading": "Ładowanie danych…",
+      "loadError": "Nie udało się pobrać danych: {error}",
+      "noData": "Brak pozycji.",
+      "filtered": "Brak wyników dla ustawionych filtrów."
+    },
     "actions": {
       "moreActions": "Więcej akcji",
-      "inOrderRail": "W szynie do zamówień"
+      "inOrderRail": "W szynie do zamówień",
+      "showSimplified": "Pokaż uproszczoną wartość",
+      "showFull": "Pokaż pełną nazwę",
+      "columns": "Kolumny"
     },
     "filters": {
       "title": "Filtry",
@@ -104,7 +115,7 @@
     }
   },
   "stockCheck": {
-    "title": "Sprawdzanie stocku — {material}",
+    "title": "Sprawdzanie stocku - {material}",
     "fetchError": "Nie udało się pobrać danych do sprawdzenia z API.",
     "summary": "Zaznaczono jako obecne: {found} z {total} (brakuje: {missing})",
     "finish": "Zakończ sprawdzanie",
@@ -144,7 +155,7 @@
   },
   "stockReports": {
     "title": "Raporty",
-    "subtitle": "Wybierz datę stocku i materiał, aby zobaczyć raport.",
+    "subtitle": "Wybierz materiał, aby zobaczyć raport.",
     "fetchError": "Nie udało się pobrać danych z API.",
     "noSession": "Nie zakończono jeszcze żadnego remanentu.",
     "trendTitle": "Łączna długość ({material}) na przestrzeni stocków",
@@ -156,8 +167,11 @@
     "colorBlack": "Czarny",
     "breakdownTitle": "{material} wg itemu",
     "clickItemHint": "Kliknij wiersz, aby zobaczyć trend itemu",
-    "itemTrendTitle": "{item} — ostatnie stocki",
-    "columnItem": "Item",
+    "itemTrendTitle": "{item} - ostatnie stocki",
+    "columnItem": "Item number",
+    "columnDiameter": "Średnica",
+    "columnXbz": "XB/Z",
+    "columnColor": "Kolor",
     "columnDelta": "Δ"
   },
   "stockFrpDatabase": {

@@ -8,17 +8,19 @@ function formatKm(value) {
   return value.toLocaleString("pl-PL", { maximumFractionDigits: 3 });
 }
 
-function itemLabel(material, source) {
-  if (!source) return "";
-  if (material === "frp") return source.frpLabel || source.itemNumber || "";
-  return source.diameter || "";
-}
-
-function itemSubLabel(material, source) {
-  if (!source) return "";
-  if (material === "frp") return source.name || "";
-  if (material === "coatedFrp") return source.type || "";
-  return source.color || "";
+// Only frp items carry a real catalog item number + full name (joined
+// from frp_catalog - see stockRowToSnapshotApi in checks.js); coatedFrp
+// and filler only ever had a diameter, so there's nothing to split there.
+function itemFields(material, source) {
+  if (!source) return { item: "", itemShort: "", diameter: "", xbz: "", color: "" };
+  if (material === "frp") {
+    const item = source.itemNumber || source.frpNumber || "";
+    return { item, itemShort: item.slice(-3), diameter: source.name || source.frpLabel || "", diameterShort: source.frpLabel || "" };
+  }
+  if (material === "coatedFrp") {
+    return { item: "", itemShort: "", diameter: source.diameter || "", xbz: source.type || "" };
+  }
+  return { item: "", itemShort: "", diameter: source.diameter || "", color: source.color || "" };
 }
 
 const ROW_STYLE = {
@@ -33,19 +35,18 @@ const STATUS_STYLE = {
   unchanged: "bg-gray-100 text-gray-500 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
-// Per-drum diff between the two chosen rounds — see computeBalance() in
+// Per-drum diff between the two chosen rounds - see computeBalance() in
 // page.js. Colors mirror the old /frp app's bilans xlsx (red = used up,
 // green = new spool). Built on MaterialsTable so every column gets the
-// same sort/filter UI as the rest of the app, plus a per-item multiselect
-// ("show only these items") on the Item and Status columns.
+// same sort/filter UI as the rest of the app, plus a multiselect ("show
+// only these") on the Status column.
 export default function BalanceTable({ material, rows, usedCount, newCount }) {
   const t = useTranslations("stockBalance");
   const [search, setSearch] = useState("");
 
   const data = rows.map((row) => ({
     id: row.drumNumber,
-    itemLabel: itemLabel(material, row.source),
-    itemSubLabel: itemSubLabel(material, row.source),
+    ...itemFields(material, row.source),
     drumNumber: row.drumNumber,
     prevKm: row.prevKm ?? 0,
     hasPrev: row.prevKm !== null,
@@ -57,32 +58,36 @@ export default function BalanceTable({ material, rows, usedCount, newCount }) {
   }));
 
   const columns = [
+    ...(material === "frp"
+      ? [{ key: "item", headerKey: "item", filterFn: "multiselect", sortable: true, simpleKey: "itemShort" }]
+      : []),
+    ...(material === "filler"
+      ? [{ key: "color", headerKey: "color", filterFn: "multiselect", sortable: true }]
+      : []),
     {
-      key: "itemLabel",
-      headerKey: "item",
+      key: "diameter",
+      headerKey: "diameter",
       filterFn: "multiselect",
       sortable: true,
-      render: (r) => (
-        <div>
-          <div className="font-medium text-gray-900 dark:text-neutral-100">{r.itemLabel}</div>
-          <div className="text-xs text-gray-400 dark:text-neutral-500">{r.itemSubLabel}</div>
-        </div>
-      ),
+      ...(material === "frp" && { simpleKey: "diameterShort" }),
     },
+    ...(material === "coatedFrp"
+      ? [{ key: "xbz", headerKey: "xbz", filterFn: "includesString", sortable: true }]
+      : []),
     { key: "drumNumber", headerKey: "spoolNumber", filterFn: "includesString", sortable: true },
     {
       key: "prevKm",
       headerKey: "prevKm",
       filterFn: "inNumberRange",
       sortable: true,
-      render: (r) => <span className="tabular-nums">{r.hasPrev ? formatKm(r.prevKm) : "—"}</span>,
+      render: (r) => <span className="tabular-nums">{r.hasPrev ? formatKm(r.prevKm) : "-"}</span>,
     },
     {
       key: "currKm",
       headerKey: "currKm",
       filterFn: "inNumberRange",
       sortable: true,
-      render: (r) => <span className="tabular-nums">{r.hasCurr ? formatKm(r.currKm) : "—"}</span>,
+      render: (r) => <span className="tabular-nums">{r.hasCurr ? formatKm(r.currKm) : "-"}</span>,
     },
     {
       key: "deltaKm",
@@ -99,7 +104,7 @@ export default function BalanceTable({ material, rows, usedCount, newCount }) {
               : "text-gray-400 dark:text-neutral-500"
           }`}
         >
-          {r.deltaKm === 0 ? "—" : `${r.deltaKm > 0 ? "+" : ""}${formatKm(r.deltaKm)}`}
+          {r.deltaKm === 0 ? "-" : `${r.deltaKm > 0 ? "+" : ""}${formatKm(r.deltaKm)}`}
         </span>
       ),
     },

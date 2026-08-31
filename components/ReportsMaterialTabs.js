@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const MATERIAL_PARAM = "material";
 const VALID_MATERIALS = ["frp", "coatedFrp", "filler"];
 
-// URL-driven material switch (?material=) for the Reports page — unlike
+// URL-driven material switch (?material=) for the Reports page - unlike
 // the Stock page's tabs (which preload all 3 materials client-side),
 // switching here re-fetches just the selected material's snapshot on
 // the server, since a report only ever looks at one material at a time.

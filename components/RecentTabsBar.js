@@ -47,7 +47,7 @@ function SortableTab({ href, active, onClose, showClose, suppressClickRef }) {
         isDragging ? "opacity-50" : ""
       } ${
         active
-          ? "-mb-px z-10 border-gray-200 dark:border-neutral-800 border-b-transparent bg-white dark:bg-neutral-900 text-navy-950 dark:text-white"
+          ? "-mb-px z-10 border-gray-200 dark:border-neutral-800 border-b-transparent dark:border-b-transparent bg-white dark:bg-neutral-900 text-navy-950 dark:text-white"
           : "border-transparent bg-transparent text-gray-500 dark:text-neutral-400 hover:bg-white/60 dark:hover:bg-neutral-900/60"
       }`}
     >
@@ -56,7 +56,7 @@ function SortableTab({ href, active, onClose, showClose, suppressClickRef }) {
         className="flex items-center gap-2"
         onClick={(event) => {
           // dnd-kit still lets a native click through on the element that
-          // was under the pointer at drag-end — without this, dragging a
+          // was under the pointer at drag-end - without this, dragging a
           // tab to reorder it also navigates to whichever tab you dropped
           // on (usually the one you just dragged).
           if (suppressClickRef.current) {
@@ -92,7 +92,7 @@ export default function RecentTabsBar({ paths, setPaths, activePath, onCloseTab 
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
   // Set as soon as a drag activates (past the sensors' delay/tolerance, so
-  // real clicks never touch it) and cleared by the first click afterward —
+  // real clicks never touch it) and cleared by the first click afterward -
   // see the comment in SortableTab's Link.
   const suppressClickRef = useRef(false);
 
@@ -118,6 +118,11 @@ export default function RecentTabsBar({ paths, setPaths, activePath, onCloseTab 
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
+      // dnd-kit's default auto-scroll reacts to the pointer's raw Y position
+      // even though restrictToHorizontalAxis keeps the dragged tab itself
+      // horizontal - dragging straight down was making the strip lurch/
+      // scroll on its own. Not needed anyway with only a handful of tabs.
+      autoScroll={false}
     >
       <SortableContext items={paths} strategy={horizontalListSortingStrategy}>
         <div className="flex items-end gap-1 overflow-x-auto overflow-y-hidden border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950/40 px-3 pt-2">

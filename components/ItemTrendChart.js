@@ -16,7 +16,7 @@ function TrendTooltip({ active, payload, label }) {
   );
 }
 
-// One item's own trend across (up to) its last 10 stock rounds — drawn
+// One item's own trend across (up to) its last 10 stock rounds - drawn
 // entirely from data the page already loaded for the breakdown table
 // (item.byDateKm), so selecting a row costs no extra request.
 export default function ItemTrendChart({ item, dateColumns }) {

@@ -25,7 +25,7 @@ async function loadSessions() {
 
 // Rounds that actually checked this material, newest first by that
 // material's own performedAt (not the bundle's, which can differ once a
-// round is attached to later after being started — see checks.js).
+// round is attached to later after being started - see checks.js).
 function materialSessions(sessions, material) {
   return sessions
     .filter((s) => s[material])
@@ -46,7 +46,7 @@ async function loadSnapshot(session, material) {
   }
 }
 
-// Per-drum diff between two chosen rounds — matched by drum number, same
+// Per-drum diff between two chosen rounds - matched by drum number, same
 // logic the old /frp app used for its "bilans" xlsx (generateBalance()):
 // present in both -> compare length; only in the earlier round -> used up
 // ("zużyta"); only in the later round -> new spool ("nowa szpula").

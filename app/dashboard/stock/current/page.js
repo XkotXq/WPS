@@ -17,7 +17,7 @@ async function loadCurrentItems(material) {
 }
 
 // Live, editable inventory (frp_current/coated_frp_current/filler_current)
-// — what's physically on the floor right now, as opposed to /dashboard/stock
+// - what's physically on the floor right now, as opposed to /dashboard/stock
 // (a historical stock-take snapshot for a chosen date).
 export default async function CurrentListPage({ searchParams }) {
   const params = await searchParams;

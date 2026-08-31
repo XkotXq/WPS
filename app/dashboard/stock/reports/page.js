@@ -1,5 +1,4 @@
 import { getFormatter, getTranslations } from "next-intl/server";
-import StockDatePicker from "@/components/StockDatePicker";
 import ReportsMaterialTabs from "@/components/ReportsMaterialTabs";
 import MaterialTrendChart from "@/components/MaterialTrendChart";
 import MaterialDrumCountChart from "@/components/MaterialDrumCountChart";
@@ -11,7 +10,7 @@ const DEFAULT_MATERIAL = "frp";
 const SESSIONS_LIMIT = 200;
 
 // Per material: which split_value the drum-count chart shows as separate
-// (toggleable) series — a fixed categorical order per the dataviz method
+// (toggleable) series - a fixed categorical order per the dataviz method
 // (never more than 3 here, so no "Other" folding needed). Colors are the
 // app's own --primary/--chart-accent-2/-3 tokens so they track dark mode.
 const SPLIT_SERIES = {
@@ -37,10 +36,6 @@ function dateKeyFromISO(iso) {
   ).padStart(2, "0")}`;
 }
 
-function sessionDateKey(session) {
-  return dateKeyFromISO(session.performedAt);
-}
-
 async function loadSessions() {
   try {
     return { sessions: await api.listStockSessions(SESSIONS_LIMIT), error: false };
@@ -50,7 +45,7 @@ async function loadSessions() {
 }
 
 // Total-length trend, split-count trend, and a per-item breakdown table
-// for one material — sourced from GET /stocks/:material/trend, one SQL
+// for one material - sourced from GET /stocks/:material/trend, one SQL
 // query (GROUP BY version, item) on the API side rather than fetching
 // every round's full item list here and summing in JS. See SPLIT_SERIES
 // above for what "item identity" and "split" mean per material, and
@@ -121,10 +116,6 @@ export default async function StockReportsPage({ searchParams }) {
 
   const material = VALID_MATERIALS.includes(params?.material) ? params.material : DEFAULT_MATERIAL;
   const { sessions, error: sessionsError } = await loadSessions();
-  const availableDates = sessions.map(sessionDateKey);
-  const session =
-    (params?.date && sessions.find((candidate) => sessionDateKey(candidate) === params.date)) ?? sessions[0] ?? null;
-  const selectedDateKey = session ? sessionDateKey(session) : null;
 
   const trend = await loadMaterialTrend(material, format).catch(() => null);
   const error = sessionsError || !trend;
@@ -146,9 +137,6 @@ export default async function StockReportsPage({ searchParams }) {
     <div>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold text-navy-950 dark:text-white">{t("title")}</h1>
-        {availableDates.length > 0 && (
-          <StockDatePicker availableDates={availableDates} selectedDate={selectedDateKey} />
-        )}
         {error && (
           <span className="text-xs font-medium text-red-600 dark:text-red-400">{t("fetchError")}</span>
         )}
@@ -160,7 +148,7 @@ export default async function StockReportsPage({ searchParams }) {
       </div>
 
       <div className="mt-6">
-        {!session && !error && (
+        {sessions.length === 0 && !error && (
           <p className="text-sm text-gray-500 dark:text-neutral-400">{t("noSession")}</p>
         )}
         {trend && (
@@ -173,6 +161,7 @@ export default async function StockReportsPage({ searchParams }) {
             />
             <MaterialBreakdownSection
               title={t("breakdownTitle", { material: tTabs(material) })}
+              material={material}
               items={trend.items}
               dateColumns={trend.dateColumns}
             />

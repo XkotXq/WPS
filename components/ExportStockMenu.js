@@ -17,7 +17,7 @@ function timestamp() {
 }
 
 // Builds an xlsx matching the real reference export (see lib/xlsxExport.js)
-// — only the sheets for materials checked here go into the file.
+// - only the sheets for materials checked here go into the file.
 export default function ExportStockMenu({ frpItems, coatedFrpItems, fillerItems }) {
   const t = useTranslations("stock.export");
   const tTabs = useTranslations("stock.tabs");

@@ -68,11 +68,11 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: var(--color-navy-950);
   --primary-foreground: oklch(0.985 0 0);
-  /* Second categorical slot (charts only) — orange, next in the fixed
+  /* Second categorical slot (charts only) - orange, next in the fixed
      categorical order after --primary's blue/navy. Validated pairing
      from the dataviz palette (slot 1 blue <-> slot 2 orange). */
   --chart-accent-2: #eb6834;
-  /* Third categorical slot — aqua, for a 3-way split (e.g. filler's
+  /* Third categorical slot - aqua, for a 3-way split (e.g. filler's
      color: GRAY/WHITE/BLACK). */
   --chart-accent-3: #1baf7a;
   --secondary: oklch(0.97 0 0);

@@ -110,7 +110,7 @@ function EntryForm({ initial, onSubmit, onCancel, submitLabel, t }) {
 
 // Dynamic "Baza FRP" admin page: lists the FRP catalog (item number, label,
 // name, XB/Z type, MMC flag) straight from GET /api/catalog and lets it be
-// edited in place — the same catalog used to resolve mmc/type/name when
+// edited in place - the same catalog used to resolve mmc/type/name when
 // rendering frp_stock/frp_current rows elsewhere in the app.
 export default function CatalogTable({ data }) {
   const t = useTranslations("stockFrpDatabase");

@@ -22,7 +22,7 @@ function fromDateKey(key) {
 
 // Lets the user pick which stock-take session to view: a button showing the
 // selected date opens a calendar where only days that actually have a stock
-// (availableDates, from GET /stocks) are selectable — everything else is
+// (availableDates, from GET /stocks) are selectable - everything else is
 // disabled. Picking a day sets ?date=YYYY-MM-DD, which the server component
 // (app/dashboard/stock/page.js) uses to load that session instead of the
 // latest one.

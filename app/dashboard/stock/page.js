@@ -8,7 +8,7 @@ import { MATERIAL_MAPPERS } from "@/lib/materials-data";
 const MATERIAL_KEYS = ["frp", "coatedFrp", "filler"];
 const SESSIONS_LIMIT = 200;
 
-// Local calendar-day key (YYYY-MM-DD) for a session's performedAt — used to
+// Local calendar-day key (YYYY-MM-DD) for a session's performedAt - used to
 // match the ?date= URL param and to mark which days have a stock in the
 // date picker.
 function sessionDateKey(session) {

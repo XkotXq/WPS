@@ -15,7 +15,7 @@ function TrendTooltip({ active, payload, label, unitLabel }) {
 }
 
 // Single series ("total length over time" for whichever material is
-// selected) — per the dataviz method a lone series carries no legend box
+// selected) - per the dataviz method a lone series carries no legend box
 // (the title already names it) and stays in one hue, here the app's own
 // --primary token so it tracks light/dark automatically.
 export default function MaterialTrendChart({ title, points }) {

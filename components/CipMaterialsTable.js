@@ -15,7 +15,7 @@ const COLUMNS = [
 ];
 
 // Live inventory from the old CIP system (materialTemporaryStorageWarehouse)
-// — fetched server-side in page.js (server-to-server, no CORS) with the
+// - fetched server-side in page.js (server-to-server, no CORS) with the
 // viewer's own CIP session token, then just rendered here.
 export default function CipMaterialsTable({ records }) {
   const t = useTranslations("materialsList");

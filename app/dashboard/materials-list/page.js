@@ -4,8 +4,8 @@ import CipMaterialsTable from "@/components/CipMaterialsTable";
 
 const CIP_INVENTORY_URL = "http://10.96.9.2/wms/materialTemporaryStorageWarehouse/query/page";
 
-// Called from this app's own server (Server Component), so — unlike a
-// browser request — it isn't subject to CIP's CORS policy; the request
+// Called from this app's own server (Server Component), so - unlike a
+// browser request - it isn't subject to CIP's CORS policy; the request
 // itself was captured from the page at
 // http://10.96.9.2/#/materialManage/rawMaterialInOut/inventory/index.
 async function loadInventory(token) {

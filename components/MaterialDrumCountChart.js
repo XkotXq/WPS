@@ -19,7 +19,7 @@ function CountTooltip({ active, payload, label }) {
 }
 
 // 2-3 series (a fixed-order categorical set, e.g. frp's mmc/standard,
-// coatedFrp's XB/Z, filler's GRAY/WHITE/BLACK — see `series` prop) — the
+// coatedFrp's XB/Z, filler's GRAY/WHITE/BLACK - see `series` prop) - the
 // legend doubles as a toggle: click an entry to hide/show that series,
 // per the interactive-legend pattern for a >=2-series chart.
 export default function MaterialDrumCountChart({ title, points, series }) {

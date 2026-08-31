@@ -28,7 +28,7 @@ export default function StockCheckPanel({ material, rawItems, columns, bundles }
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Display only — lengths are converted to km here for frp/coatedFrp
+  // Display only - lengths are converted to km here for frp/coatedFrp
   // (see mapFrpItem/mapCoatedFrpItem). Submission always reads from
   // rawItems below so the raw, in-meters value is what reaches the API.
   const displayItems = useMemo(
