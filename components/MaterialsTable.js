@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   columnFilteringFeature,
   createColumnHelper,
@@ -47,11 +47,20 @@ const features = tableFeatures({
 });
 const columnHelper = createColumnHelper();
 
+// Not a TanStack built-in — the filter value is the set of visible
+// option strings (from ColumnFilterHeader's "multiselect" variant); a
+// column with no filter set (undefined) means "everything visible".
+function filterFn_inSet(row, columnId, filterValue) {
+  if (!filterValue) return true;
+  return filterValue.includes(String(row.getValue(columnId) ?? ""));
+}
+
 const COLUMN_FILTER_FNS = {
   includesString: filterFn_includesString,
   inNumberRange: filterFn_inNumberRange,
   weakEquals: filterFn_weakEquals,
   equals: filterFn_equals,
+  multiselect: filterFn_inSet,
 };
 
 function BooleanCell({ value }) {
@@ -75,6 +84,9 @@ export default function MaterialsTable({
   globalFilter: controlledGlobalFilter,
   onGlobalFilterChange: controlledSetGlobalFilter,
   showOrderRailAction = false,
+  renderRowActions,
+  onSelectionChange,
+  rowClassName,
 }) {
   const tColumns = useTranslations("stock.columns");
   const tStock = useTranslations("stock");
@@ -111,14 +123,22 @@ export default function MaterialsTable({
       ...columnConfig.map((column) =>
         columnHelper.accessor(column.key, {
           header: tColumns(column.headerKey),
-          ...(column.type === "boolean" && {
-            cell: ({ getValue }) => <BooleanCell value={getValue()} />,
-          }),
+          ...(column.render
+            ? { cell: ({ row }) => column.render(row.original) }
+            : column.type === "boolean" && { cell: ({ getValue }) => <BooleanCell value={getValue()} /> }),
           ...(column.filterFn && { filterFn: COLUMN_FILTER_FNS[column.filterFn] }),
           ...(column.sortable && { sortFn: sortFn_alphanumeric }),
         })
       ),
-      ...(showOrderRailAction
+      ...(renderRowActions
+        ? [
+            columnHelper.display({
+              id: "actions",
+              header: "",
+              cell: ({ row }) => renderRowActions(row.original),
+            }),
+          ]
+        : showOrderRailAction
         ? [
             columnHelper.display({
               id: "actions",
@@ -157,7 +177,7 @@ export default function MaterialsTable({
           ]
         : []),
     ],
-    [tColumns, tActions, columnConfig, showOrderRailAction, orderRailFlags]
+    [tColumns, tActions, columnConfig, showOrderRailAction, renderRowActions, orderRailFlags]
   );
 
   const table = useTable(
@@ -182,6 +202,13 @@ export default function MaterialsTable({
 
   const selectedCount = Object.keys(table.state.rowSelection).length;
 
+  // Lets a parent (e.g. the stock-checking flow, where a checked row
+  // means "jest"/found) observe selection without taking over control of
+  // the table's own internal rowSelection state.
+  useEffect(() => {
+    onSelectionChange?.(table.state.rowSelection);
+  }, [table.state.rowSelection, onSelectionChange]);
+
   return (
     <div>
       <Table containerClassName="max-h-[60vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-neutral-800">
@@ -193,21 +220,31 @@ export default function MaterialsTable({
             >
               {headerGroup.headers.map((header) => {
                 const config = columnConfig.find((c) => c.key === header.column.id);
+                const isMultiselect = config?.filterFn === "multiselect";
                 return (
                   <TableHead
                     key={header.id}
-                    className="sticky top-0 z-10 h-11 bg-navy-950 px-4 text-sm font-semibold text-white dark:bg-navy-500"
+                    className={`sticky top-0 z-10 h-11 bg-navy-950 px-4 text-sm font-semibold text-white dark:bg-navy-500 ${config?.className ?? ""}`}
                   >
                     {config?.filterFn ? (
                       <ColumnFilterHeader
                         column={header.column}
                         label={tColumns(config.headerKey)}
                         variant={
-                          config.type === "boolean"
+                          isMultiselect
+                            ? "multiselect"
+                            : config.type === "boolean"
                             ? "boolean"
                             : config.filterFn === "inNumberRange"
                             ? "range"
                             : "text"
+                        }
+                        options={
+                          isMultiselect
+                            ? [...new Set(data.map((row) => String(row[config.key] ?? "")))].sort((a, b) =>
+                                a.localeCompare(b, undefined, { numeric: true })
+                              )
+                            : undefined
                         }
                         sortable={Boolean(config.sortable)}
                       />
@@ -226,17 +263,20 @@ export default function MaterialsTable({
               key={row.id}
               data-state={row.getIsSelected() ? "selected" : undefined}
               className={`border-gray-100 dark:border-neutral-800 ${
-                index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : ""
+                rowClassName?.(row.original) || (index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : "")
               } data-[state=selected]:bg-navy-50 dark:data-[state=selected]:bg-navy-950/40 hover:bg-navy-50/60 dark:hover:bg-neutral-800/60`}
             >
-              {row.getAllCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  className="px-4 py-2.5 text-gray-700 dark:text-neutral-300"
-                >
-                  <table.FlexRender cell={cell} />
-                </TableCell>
-              ))}
+              {row.getAllCells().map((cell) => {
+                const config = columnConfig.find((c) => c.key === cell.column.id);
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className={`px-4 py-2.5 text-gray-700 dark:text-neutral-300 ${config?.className ?? ""}`}
+                  >
+                    <table.FlexRender cell={cell} />
+                  </TableCell>
+                );
+              })}
             </TableRow>
           ))}
         </TableBody>

@@ -9,8 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-const DATE_PARAM = "date";
-
 function toDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate()
@@ -28,7 +26,7 @@ function fromDateKey(key) {
 // disabled. Picking a day sets ?date=YYYY-MM-DD, which the server component
 // (app/dashboard/stock/page.js) uses to load that session instead of the
 // latest one.
-export default function StockDatePicker({ availableDates, selectedDate }) {
+export default function StockDatePicker({ availableDates, selectedDate, paramName = "date", placeholder }) {
   const t = useTranslations("stock");
   const locale = useLocale();
   const router = useRouter();
@@ -43,7 +41,7 @@ export default function StockDatePicker({ availableDates, selectedDate }) {
   function handleSelect(date) {
     if (!date) return;
     const params = new URLSearchParams(searchParams.toString());
-    params.set(DATE_PARAM, toDateKey(date));
+    params.set(paramName, toDateKey(date));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     setOpen(false);
   }
@@ -58,7 +56,7 @@ export default function StockDatePicker({ availableDates, selectedDate }) {
               ? new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(
                   selected
                 )
-              : t("pickDate")}
+              : placeholder ?? t("pickDate")}
           </Button>
         }
       />

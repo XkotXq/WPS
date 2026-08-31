@@ -19,13 +19,13 @@ import ThemeToggle from "@/components/ThemeToggle";
 import RecentTabsBar from "@/components/RecentTabsBar";
 import NavGroup from "@/components/NavGroup";
 import { PAGE_REGISTRY, navLinkClasses } from "@/lib/dashboard-pages";
+import { logoutCip, getCipSession } from "@/lib/cipSession";
 
 const SIDEBAR_COLLAPSED_KEY = "wms-sidebar-collapsed";
 const RECENT_PAGES_KEY = "wms-recent-pages";
 const STOCK_BASE_PATH = "/dashboard/stock";
 const MATERIALS_BASE_PATH = "/dashboard/materials-list";
 const MAX_RECENT_PAGES = 5;
-
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -38,9 +38,12 @@ export default function DashboardLayout({ children }) {
   );
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
+  const [session, setSession] = useState(null);
+console.log(session)
 
   useEffect(() => {
     setMounted(true);
+    getCipSession().then(setSession);
   }, []);
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function DashboardLayout({ children }) {
 
   const stockChildren = [
     { href: "/dashboard/stock", label: tNav("currentStock") },
-    { href: "/dashboard/stock/previous", label: tNav("previousStocks") },
+    { href: "/dashboard/stock/current", label: tNav("currentList") },
     { href: "/dashboard/stock/balance", label: tNav("balance") },
     { href: "/dashboard/stock/reports", label: tNav("reports") },
     { href: "/dashboard/stock/frp-database", label: tNav("frpDatabase") },
@@ -79,7 +82,7 @@ export default function DashboardLayout({ children }) {
   ];
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-neutral-950 p-4 md:p-6">
+    <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-neutral-950 p-2 md:p-4">
       <div className="flex h-[calc(100vh-2rem)] md:h-[calc(100vh-3rem)] w-full overflow-hidden rounded-[28px] bg-white dark:bg-neutral-900 shadow-lg shadow-gray-200/60 dark:shadow-none dark:border dark:border-neutral-800">
         <aside
           className={`flex shrink-0 flex-col border-r border-gray-200 dark:border-neutral-800 p-4 transition-[width] duration-200 ${
@@ -169,7 +172,12 @@ export default function DashboardLayout({ children }) {
 
           <button
             type="button"
-            onClick={() => router.push("/")}
+            onClick={() => {
+              logoutCip().then(() => {
+                router.push("/");
+                router.refresh();
+              });
+            }}
             title={collapsed ? tDashboard("logout") : undefined}
             className={`flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-600 dark:text-neutral-400 transition-colors hover:bg-navy-50 dark:hover:bg-neutral-800 hover:text-navy-950 dark:hover:text-white ${
               collapsed ? "justify-center" : ""
@@ -181,9 +189,19 @@ export default function DashboardLayout({ children }) {
         </aside>
 
         <div className="flex flex-1 flex-col overflow-hidden">
-          <header className="flex items-center justify-end gap-2 border-b border-gray-200 dark:border-neutral-800 px-6 py-4">
-            <ThemeToggle />
-            <LanguageSwitcher />
+          <header className="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-neutral-800 px-6 py-4">
+            <div className="flex flex-col leading-tight">
+              {session?.username && (
+                <span className="text-sm font-semibold text-navy-950 dark:text-white">{session.username}</span>
+              )}
+              {session?.userId && (
+                <span className="text-xs text-gray-500 dark:text-neutral-400">{session.userId}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <LanguageSwitcher />
+            </div>
           </header>
 
           {mounted && recentPaths.length > 1 && (

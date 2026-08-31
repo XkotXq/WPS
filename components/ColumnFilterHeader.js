@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDownZA, ArrowUpAZ, Filter, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const inputClasses =
@@ -27,17 +28,31 @@ const optionButtonClasses = (active) =>
 // with sorting (asc/desc) and a filter input for just that column — a
 // quicker alternative to the "More filters" panel, driven by the same
 // TanStack column-filter/sorting state, so every UI stays in sync.
-export default function ColumnFilterHeader({ column, label, variant = "text", sortable = false }) {
+export default function ColumnFilterHeader({ column, label, variant = "text", sortable = false, options }) {
   const t = useTranslations("stock.filters");
   const tColumns = useTranslations("stock.columns");
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(() => initDraft(column, variant));
+  const [draft, setDraft] = useState(() => initDraft(column, variant, options));
+  const [search, setSearch] = useState("");
   const isFiltered = column.getIsFiltered();
   const sortDir = sortable ? column.getIsSorted() : false;
 
+  const visibleOptions = useMemo(() => {
+    if (variant !== "multiselect") return [];
+    const needle = search.trim().toLowerCase();
+    return needle ? options.filter((o) => o.toLowerCase().includes(needle)) : options;
+  }, [variant, options, search]);
+
   function handleOpenChange(next) {
-    if (next) setDraft(initDraft(column, variant));
+    if (next) {
+      setDraft(initDraft(column, variant, options));
+      setSearch("");
+    }
     setOpen(next);
+  }
+
+  function toggleOption(value) {
+    setDraft((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
   }
 
   function apply() {
@@ -46,6 +61,8 @@ export default function ColumnFilterHeader({ column, label, variant = "text", so
       column.setFilterValue(min.trim() || max.trim() ? [min.trim(), max.trim()] : undefined);
     } else if (variant === "boolean") {
       column.setFilterValue(draft === true || draft === false ? draft : undefined);
+    } else if (variant === "multiselect") {
+      column.setFilterValue(draft.length === options.length ? undefined : draft);
     } else {
       column.setFilterValue(draft.trim() || undefined);
     }
@@ -135,6 +152,48 @@ export default function ColumnFilterHeader({ column, label, variant = "text", so
                 className={inputClasses}
               />
             </div>
+          ) : variant === "multiselect" ? (
+            <div>
+              <input
+                type="text"
+                autoFocus
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("searchOptions")}
+                className={inputClasses}
+              />
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setDraft(options)}
+                  className="font-medium text-navy-700 hover:underline dark:text-navy-300"
+                >
+                  {t("selectAll")}
+                </button>
+                <span className="text-gray-300 dark:text-neutral-600">·</span>
+                <button
+                  type="button"
+                  onClick={() => setDraft([])}
+                  className="font-medium text-navy-700 hover:underline dark:text-navy-300"
+                >
+                  {t("selectNone")}
+                </button>
+              </div>
+              <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                {visibleOptions.map((value) => (
+                  <label
+                    key={value}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm text-gray-700 hover:bg-gray-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  >
+                    <Checkbox checked={draft.includes(value)} onCheckedChange={() => toggleOption(value)} />
+                    <span className="truncate">{value}</span>
+                  </label>
+                ))}
+                {visibleOptions.length === 0 && (
+                  <p className="px-1 py-1 text-sm text-gray-400 dark:text-neutral-500">{t("noOptions")}</p>
+                )}
+              </div>
+            </div>
           ) : variant === "boolean" ? (
             <div className="flex items-center gap-2">
               <button
@@ -176,9 +235,10 @@ export default function ColumnFilterHeader({ column, label, variant = "text", so
   );
 }
 
-function initDraft(column, variant) {
+function initDraft(column, variant, options) {
   const current = column.getFilterValue();
   if (variant === "range") return current ?? ["", ""];
   if (variant === "boolean") return current;
+  if (variant === "multiselect") return current ?? options;
   return current ?? "";
 }

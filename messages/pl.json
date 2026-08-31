@@ -2,19 +2,21 @@
   "login": {
     "title": "Zaloguj się",
     "subtitle": "System Zarządzania Magazynem",
-    "emailLabel": "Adres e-mail",
-    "emailPlaceholder": "ty@firma.pl",
+    "emailLabel": "Login",
+    "emailPlaceholder": "Login CIP",
     "passwordLabel": "Hasło",
     "passwordPlaceholder": "••••••••",
-    "rememberMe": "Zapamiętaj mnie",
     "submit": "Zaloguj się",
-    "demoNote": "Tryb podglądu — dane logowania nie są wymagane, kliknij „Zaloguj się”, aby przejść dalej."
+    "submitting": "Logowanie…",
+    "missingFields": "Wpisz login i hasło.",
+    "loggingInAs": "Zalogowano jako"
   },
   "nav": {
     "home": "Strona główna",
     "stock": "Stock",
-    "currentStock": "Stock",
-    "previousStocks": "Poprzednie stocki",
+    "currentStock": "Lista stocków",
+    "currentList": "Aktualna lista",
+    "checkStock": "Sprawdzanie stocku",
     "balance": "Bilans",
     "reports": "Raporty",
     "frpDatabase": "Baza FRP",
@@ -46,11 +48,16 @@
       "button": "Eksportuj stock",
       "cipButton": "Eksportuj do CIP",
       "selectMaterials": "Wybierz materiały",
-      "confirm": "Potwierdź"
+      "confirm": "Potwierdź",
+      "exporting": "Eksportowanie…"
     },
     "columns": {
       "lp": "Lp.",
       "item": "Item number",
+      "itemNumber": "Nr itemu",
+      "label": "Etykieta",
+      "name": "Nazwa",
+      "mmc": "MMC",
       "color": "Kolor",
       "diameter": "Średnica",
       "length": "Długość (km)",
@@ -60,6 +67,15 @@
       "flameRetardant": "Niepalny",
       "location": "Lokalizacja",
       "note": "Notatka",
+      "prevKm": "Poprzednio (km)",
+      "currKm": "Teraz (km)",
+      "delta": "Δ (km)",
+      "materialsItemNo": "Nr itemu",
+      "materialsItemName": "Nazwa",
+      "materialsSpec": "Specyfikacja",
+      "materialsLocation": "Lokalizacja",
+      "materialsCreateTime": "Data utworzenia",
+      "status": "Status",
       "yes": "Tak",
       "no": "Nie"
     },
@@ -79,28 +95,95 @@
       "lengthMin": "Dł. min",
       "lengthMax": "Dł. max",
       "apply": "Filtruj",
-      "reset": "Wyczyść filtry"
+      "reset": "Wyczyść filtry",
+      "searchOptions": "Szukaj...",
+      "selectAll": "Zaznacz wszystkie",
+      "selectNone": "Odznacz wszystkie",
+      "noOptions": "Brak wyników"
     }
   },
-  "stockPrevious": {
-    "title": "Poprzednie stocki",
-    "subtitle": "Tutaj pojawi się historia stanów magazynowych. Ta sekcja jest w przygotowaniu."
+  "stockCheck": {
+    "title": "Sprawdzanie stocku — {material}",
+    "fetchError": "Nie udało się pobrać danych do sprawdzenia z API.",
+    "summary": "Zaznaczono jako obecne: {found} z {total} (brakuje: {missing})",
+    "finish": "Zakończ sprawdzanie",
+    "pickTarget": "Do jakiego stocku dodać wynik?",
+    "newStock": "Nowy stock",
+    "bundleLabel": "Stock z {date} ({coverage})",
+    "bundleEmpty": "pusty",
+    "performedBy": "Wykonał/a (opcjonalnie)",
+    "confirm": "Zatwierdź"
+  },
+  "stockCurrentList": {
+    "title": "Aktualna lista",
+    "subtitle": "Aktualny stan z aplikacji.",
+    "fetchError": "Nie udało się pobrać danych z API."
   },
   "stockBalance": {
     "title": "Bilans",
-    "subtitle": "Tutaj pojawi się bilans magazynowy. Ta sekcja jest w przygotowaniu."
+    "subtitle": "Wybierz dwie daty stocku i materiał, aby porównać stan szpul.",
+    "from": "Od",
+    "to": "Do",
+    "pickDate": "Wybierz datę",
+    "notEnoughData": "Potrzeba co najmniej dwóch stocków dla tego materiału.",
+    "pickBothDates": "Wybierz obie daty, aby zobaczyć bilans.",
+    "fetchError": "Nie udało się pobrać danych z API.",
+    "summary": "Szpul łącznie: {total} · zużytych: {used} · nowych: {new}",
+    "columnItem": "Item",
+    "columnDrum": "Nr szpuli",
+    "columnPrev": "Poprzednio (km)",
+    "columnCurr": "Teraz (km)",
+    "columnDelta": "Δ (km)",
+    "columnStatus": "Status",
+    "status": {
+      "used": "Zużyta",
+      "new": "Nowa szpula",
+      "unchanged": "Bez zmian"
+    }
   },
   "stockReports": {
     "title": "Raporty",
-    "subtitle": "Tutaj pojawią się raporty magazynowe. Ta sekcja jest w przygotowaniu."
+    "subtitle": "Wybierz datę stocku i materiał, aby zobaczyć raport.",
+    "fetchError": "Nie udało się pobrać danych z API.",
+    "noSession": "Nie zakończono jeszcze żadnego remanentu.",
+    "trendTitle": "Łączna długość ({material}) na przestrzeni stocków",
+    "drumCountTitle": "Liczba szpul ({material}) na przestrzeni stocków",
+    "seriesMmc": "MMC",
+    "seriesStandard": "Standardowe",
+    "colorGray": "Szary",
+    "colorWhite": "Biały",
+    "colorBlack": "Czarny",
+    "breakdownTitle": "{material} wg itemu",
+    "clickItemHint": "Kliknij wiersz, aby zobaczyć trend itemu",
+    "itemTrendTitle": "{item} — ostatnie stocki",
+    "columnItem": "Item",
+    "columnDelta": "Δ"
   },
   "stockFrpDatabase": {
     "title": "Baza FRP",
-    "subtitle": "Tutaj pojawi się baza danych FRP. Ta sekcja jest w przygotowaniu."
+    "subtitle": "Katalog numerów FRP używany przy sprawdzaniu i eksporcie stocku.",
+    "fetchError": "Nie udało się pobrać bazy FRP z API.",
+    "actions": {
+      "add": "Dodaj wpis",
+      "edit": "Edytuj",
+      "delete": "Usuń",
+      "save": "Zapisz",
+      "confirmDelete": "Usunąć wpis {number} z bazy FRP?"
+    },
+    "form": {
+      "number": "Nr itemu",
+      "label": "Etykieta",
+      "name": "Nazwa",
+      "type": "XB/Z",
+      "mmc": "MMC",
+      "cancel": "Anuluj"
+    }
   },
   "materialsList": {
     "title": "Lista materiałów",
-    "subtitle": "Tutaj będzie zarządzana lista materiałów. Ta sekcja jest w przygotowaniu."
+    "subtitle": "Stan materiałów z CIP",
+    "fetchError": "Nie udało się pobrać danych z CIP.",
+    "count": "Pozycji: {count}"
   },
   "materialsReports": {
     "title": "Raporty",

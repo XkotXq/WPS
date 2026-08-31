@@ -2,19 +2,21 @@
   "login": {
     "title": "Sign in",
     "subtitle": "Warehouse Management System",
-    "emailLabel": "Email address",
-    "emailPlaceholder": "you@company.com",
+    "emailLabel": "Login",
+    "emailPlaceholder": "CIP login",
     "passwordLabel": "Password",
     "passwordPlaceholder": "••••••••",
-    "rememberMe": "Remember me",
     "submit": "Log in",
-    "demoNote": "Preview mode — no credentials required, click Log in to continue."
+    "submitting": "Signing in…",
+    "missingFields": "Enter your login and password.",
+    "loggingInAs": "Signed in as"
   },
   "nav": {
     "home": "Home",
     "stock": "Stock",
-    "currentStock": "Stock",
-    "previousStocks": "Previous Stocks",
+    "currentStock": "Stock list",
+    "currentList": "Current list",
+    "checkStock": "Check Stock",
     "balance": "Balance",
     "reports": "Reports",
     "frpDatabase": "FRP Database",
@@ -46,11 +48,16 @@
       "button": "Export stock",
       "cipButton": "Export to CIP",
       "selectMaterials": "Select materials",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "exporting": "Exporting…"
     },
     "columns": {
       "lp": "No.",
       "item": "Item number",
+      "itemNumber": "Item no.",
+      "label": "Label",
+      "name": "Name",
+      "mmc": "MMC",
       "color": "Color",
       "diameter": "Diameter",
       "length": "Length (km)",
@@ -60,6 +67,15 @@
       "flameRetardant": "Flame retardant",
       "location": "Location",
       "note": "Note",
+      "prevKm": "Previous (km)",
+      "currKm": "Current (km)",
+      "delta": "Δ (km)",
+      "materialsItemNo": "Item no.",
+      "materialsItemName": "Name",
+      "materialsSpec": "Specification",
+      "materialsLocation": "Location",
+      "materialsCreateTime": "Created at",
+      "status": "Status",
       "yes": "Yes",
       "no": "No"
     },
@@ -79,28 +95,95 @@
       "lengthMin": "Min length",
       "lengthMax": "Max length",
       "apply": "Filter",
-      "reset": "Clear filters"
+      "reset": "Clear filters",
+      "searchOptions": "Search...",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "noOptions": "No matches"
     }
   },
-  "stockPrevious": {
-    "title": "Previous Stocks",
-    "subtitle": "Historical stock levels will be shown here. This section is coming soon."
+  "stockCheck": {
+    "title": "Check Stock — {material}",
+    "fetchError": "Failed to fetch check data from the API.",
+    "summary": "Marked present: {found} of {total} (missing: {missing})",
+    "finish": "Finish check",
+    "pickTarget": "Which stock should this be added to?",
+    "newStock": "New stock",
+    "bundleLabel": "Stock from {date} ({coverage})",
+    "bundleEmpty": "empty",
+    "performedBy": "Performed by (optional)",
+    "confirm": "Confirm"
+  },
+  "stockCurrentList": {
+    "title": "Current list",
+    "subtitle": "Current state from the app.",
+    "fetchError": "Failed to fetch data from the API."
   },
   "stockBalance": {
     "title": "Balance",
-    "subtitle": "The stock balance will be shown here. This section is coming soon."
+    "subtitle": "Pick two stock dates and a material to compare drum status.",
+    "from": "From",
+    "to": "To",
+    "pickDate": "Pick a date",
+    "notEnoughData": "Need at least two stocks for this material.",
+    "pickBothDates": "Pick both dates to see the balance.",
+    "fetchError": "Failed to fetch data from the API.",
+    "summary": "Total drums: {total} · used up: {used} · new: {new}",
+    "columnItem": "Item",
+    "columnDrum": "Drum no.",
+    "columnPrev": "Previous (km)",
+    "columnCurr": "Current (km)",
+    "columnDelta": "Δ (km)",
+    "columnStatus": "Status",
+    "status": {
+      "used": "Used up",
+      "new": "New spool",
+      "unchanged": "Unchanged"
+    }
   },
   "stockReports": {
     "title": "Reports",
-    "subtitle": "Stock reports will be shown here. This section is coming soon."
+    "subtitle": "Pick a stock date and material to see a report.",
+    "fetchError": "Failed to fetch data from the API.",
+    "noSession": "No stock-take has been completed yet.",
+    "trendTitle": "Total length ({material}) across stocks",
+    "drumCountTitle": "Drum count ({material}) across stocks",
+    "seriesMmc": "MMC",
+    "seriesStandard": "Standard",
+    "colorGray": "Gray",
+    "colorWhite": "White",
+    "colorBlack": "Black",
+    "breakdownTitle": "{material} by item",
+    "clickItemHint": "Click a row to see that item's trend",
+    "itemTrendTitle": "{item} — recent stocks",
+    "columnItem": "Item",
+    "columnDelta": "Δ"
   },
   "stockFrpDatabase": {
     "title": "FRP Database",
-    "subtitle": "The FRP database will be shown here. This section is coming soon."
+    "subtitle": "The FRP catalog used when checking and exporting stock.",
+    "fetchError": "Failed to fetch the FRP catalog from the API.",
+    "actions": {
+      "add": "Add entry",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "confirmDelete": "Delete entry {number} from the FRP catalog?"
+    },
+    "form": {
+      "number": "Item no.",
+      "label": "Label",
+      "name": "Name",
+      "type": "XB/Z",
+      "mmc": "MMC",
+      "cancel": "Cancel"
+    }
   },
   "materialsList": {
     "title": "Materials List",
-    "subtitle": "The materials list will be managed here. This section is coming soon."
+    "subtitle": "Current temporary-storage warehouse inventory, live from CIP.",
+    "fetchError": "Failed to fetch data from CIP.",
+    "count": "Items: {count}"
   },
   "materialsReports": {
     "title": "Reports",

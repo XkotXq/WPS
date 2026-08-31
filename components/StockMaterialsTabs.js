@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Send } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import MaterialsTable from "@/components/MaterialsTable";
 import FrpFilters from "@/components/FrpFilters";
 import ExportStockMenu from "@/components/ExportStockMenu";
@@ -17,7 +15,6 @@ const DEFAULT_MATERIAL = "frp";
 
 export default function StockMaterialsTabs({ frpItems, coatedFrpItems, fillerItems }) {
   const t = useTranslations("stock.tabs");
-  const tExport = useTranslations("stock.export");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -53,11 +50,7 @@ export default function StockMaterialsTabs({ frpItems, coatedFrpItems, fillerIte
           <TabsTrigger value="filler">{t("filler")}</TabsTrigger>
         </TabsList>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Send className="h-4 w-4" />
-            {tExport("cipButton")}
-          </Button>
-          <ExportStockMenu />
+          <ExportStockMenu frpItems={frpItems} coatedFrpItems={coatedFrpItems} fillerItems={fillerItems} />
         </div>
       </div>
 
