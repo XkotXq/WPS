@@ -78,6 +78,15 @@ function BooleanCell({ value }) {
   );
 }
 
+// The row keeps the raw ISO timestamp (so sorting stays chronological);
+// this only formats it for display.
+function DateTimeCell({ value }) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return <span>{new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short" }).format(date)}</span>;
+}
+
 export default function MaterialsTable({
   data,
   columns: columnConfig,
@@ -125,7 +134,11 @@ export default function MaterialsTable({
           header: tColumns(column.headerKey),
           ...(column.render
             ? { cell: ({ row }) => column.render(row.original) }
-            : column.type === "boolean" && { cell: ({ getValue }) => <BooleanCell value={getValue()} /> }),
+            : column.type === "boolean"
+            ? { cell: ({ getValue }) => <BooleanCell value={getValue()} /> }
+            : column.type === "datetime"
+            ? { cell: ({ getValue }) => <DateTimeCell value={getValue()} /> }
+            : {}),
           ...(column.filterFn && { filterFn: COLUMN_FILTER_FNS[column.filterFn] }),
           ...(column.sortable && { sortFn: sortFn_alphanumeric }),
         })

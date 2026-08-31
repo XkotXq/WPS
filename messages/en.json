@@ -67,6 +67,7 @@
       "flameRetardant": "Flame retardant",
       "location": "Location",
       "note": "Note",
+      "createdAt": "Added",
       "prevKm": "Previous (km)",
       "currKm": "Current (km)",
       "delta": "Δ (km)",

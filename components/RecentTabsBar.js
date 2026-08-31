@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
@@ -21,7 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { restrictToHorizontalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 import { PAGE_REGISTRY } from "@/lib/dashboard-pages";
 
-function SortableTab({ href, active, onClose }) {
+function SortableTab({ href, active, onClose, showClose, suppressClickRef }) {
   const tNav = useTranslations("nav");
   const page = PAGE_REGISTRY.find((item) => item.href === href);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -50,31 +51,54 @@ function SortableTab({ href, active, onClose }) {
           : "border-transparent bg-transparent text-gray-500 dark:text-neutral-400 hover:bg-white/60 dark:hover:bg-neutral-900/60"
       }`}
     >
-      <Link href={href} className="flex items-center gap-2">
+      <Link
+        href={href}
+        className="flex items-center gap-2"
+        onClick={(event) => {
+          // dnd-kit still lets a native click through on the element that
+          // was under the pointer at drag-end — without this, dragging a
+          // tab to reorder it also navigates to whichever tab you dropped
+          // on (usually the one you just dragged).
+          if (suppressClickRef.current) {
+            event.preventDefault();
+            suppressClickRef.current = false;
+          }
+        }}
+      >
         <Icon className="h-3.5 w-3.5 shrink-0" />
         {tNav(page.key)}
       </Link>
-      <button
-        type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.preventDefault();
-          onClose(href);
-        }}
-        title={tNav("closeTab")}
-        className="cursor-pointer rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-700 group-hover:opacity-100 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-white"
-      >
-        <X className="h-3 w-3" />
-      </button>
+      {showClose && (
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.preventDefault();
+            onClose(href);
+          }}
+          title={tNav("closeTab")}
+          className="cursor-pointer rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-700 group-hover:opacity-100 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-white"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }
 
-export default function RecentTabsBar({ paths, setPaths, activePath }) {
+export default function RecentTabsBar({ paths, setPaths, activePath, onCloseTab }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
+  // Set as soon as a drag activates (past the sensors' delay/tolerance, so
+  // real clicks never touch it) and cleared by the first click afterward —
+  // see the comment in SortableTab's Link.
+  const suppressClickRef = useRef(false);
+
+  function handleDragStart() {
+    suppressClickRef.current = true;
+  }
 
   function handleDragEnd(event) {
     const { active, over } = event;
@@ -87,21 +111,25 @@ export default function RecentTabsBar({ paths, setPaths, activePath }) {
     });
   }
 
-  function handleClose(href) {
-    setPaths((prev) => prev.filter((path) => path !== href));
-  }
-
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
     >
       <SortableContext items={paths} strategy={horizontalListSortingStrategy}>
         <div className="flex items-end gap-1 overflow-x-auto overflow-y-hidden border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-950/40 px-3 pt-2">
           {paths.map((href) => (
-            <SortableTab key={href} href={href} active={activePath === href} onClose={handleClose} />
+            <SortableTab
+              key={href}
+              href={href}
+              active={activePath === href}
+              onClose={onCloseTab}
+              showClose={paths.length > 1}
+              suppressClickRef={suppressClickRef}
+            />
           ))}
         </div>
       </SortableContext>

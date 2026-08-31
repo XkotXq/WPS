@@ -67,6 +67,7 @@
       "flameRetardant": "Niepalny",
       "location": "Lokalizacja",
       "note": "Notatka",
+      "createdAt": "Dodano",
       "prevKm": "Poprzednio (km)",
       "currKm": "Teraz (km)",
       "delta": "Δ (km)",

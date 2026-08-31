@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -39,7 +39,11 @@ export default function DashboardLayout({ children }) {
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState(null);
-console.log(session)
+  // Tracks true most-recently-visited order (separate from `recentPaths`,
+  // which is the tab bar's visual/insertion order and only reorders via
+  // drag) so closing the active tab can jump to the tab you were on before
+  // it, like a browser — not just the next one in the visual list.
+  const mruRef = useRef([]);
 
   useEffect(() => {
     setMounted(true);
@@ -58,7 +62,19 @@ console.log(session)
       const next = [...prev, pathname];
       return next.length > MAX_RECENT_PAGES ? next.slice(next.length - MAX_RECENT_PAGES) : next;
     });
+    mruRef.current = [...mruRef.current.filter((p) => p !== pathname), pathname];
   }, [pathname, setRecentPaths]);
+
+  function handleCloseTab(href) {
+    setRecentPaths((prev) => {
+      const next = prev.filter((p) => p !== href);
+      if (href === pathname) {
+        const mru = mruRef.current.filter((p) => p !== href && next.includes(p));
+        router.push(mru[mru.length - 1] ?? next[next.length - 1] ?? "/dashboard");
+      }
+      return next;
+    });
+  }
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -204,8 +220,13 @@ console.log(session)
             </div>
           </header>
 
-          {mounted && recentPaths.length > 1 && (
-            <RecentTabsBar paths={recentPaths} setPaths={setRecentPaths} activePath={pathname} />
+          {mounted && recentPaths.length >= 1 && (
+            <RecentTabsBar
+              paths={recentPaths}
+              setPaths={setRecentPaths}
+              activePath={pathname}
+              onCloseTab={handleCloseTab}
+            />
           )}
 
           <main className="flex-1 overflow-auto p-8">{children}</main>
