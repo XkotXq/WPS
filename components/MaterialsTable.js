@@ -99,6 +99,7 @@ export default function MaterialsTable({
   renderRowActions,
   onSelectionChange,
   rowClassName,
+  onRowClick,
   isLoading = false,
   loadError = null,
 }) {
@@ -374,7 +375,8 @@ export default function MaterialsTable({
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() ? "selected" : undefined}
-                className={`border-gray-100 dark:border-neutral-800 ${
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                className={`border-gray-100 dark:border-neutral-800 ${onRowClick ? "cursor-pointer" : ""} ${
                   rowClassName?.(row.original) || (index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : "")
                 } data-[state=selected]:bg-navy-50 dark:data-[state=selected]:bg-navy-950/40 hover:bg-navy-50/60 dark:hover:bg-neutral-800/60`}
               >

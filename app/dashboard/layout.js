@@ -39,10 +39,7 @@ export default function DashboardLayout({ children }) {
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState(null);
-  // Tracks true most-recently-visited order (separate from `recentPaths`,
-  // which is the tab bar's visual/insertion order and only reorders via
-  // drag) so closing the active tab can jump to the tab you were on before
-  // it, like a browser - not just the next one in the visual list.
+  
   const mruRef = useRef([]);
 
   useEffect(() => {
@@ -94,6 +91,7 @@ export default function DashboardLayout({ children }) {
 
   const materialsChildren = [
     { href: "/dashboard/materials-list", label: tNav("materialsList") },
+    { href: "/dashboard/materials-list/history", label: tNav("materialsHistory") },
     { href: "/dashboard/materials-list/reports", label: tNav("reports") },
   ];
 

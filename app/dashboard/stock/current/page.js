@@ -16,6 +16,17 @@ async function loadCurrentItems(material) {
   }
 }
 
+// Only frp has a real item catalog (see api/src/materials.js: frp.catalog,
+// coatedFrp/filler.catalog are null) - the add-item form uses this to let
+// you pick a real item number instead of typing one freehand.
+async function loadFrpCatalog() {
+  try {
+    return await api.listCatalog();
+  } catch {
+    return [];
+  }
+}
+
 // Live, editable inventory (frp_current/coated_frp_current/filler_current)
 // - what's physically on the floor right now, as opposed to /dashboard/stock
 // (a historical stock-take snapshot for a chosen date).
@@ -24,7 +35,10 @@ export default async function CurrentListPage({ searchParams }) {
   const t = await getTranslations("stockCurrentList");
 
   const material = VALID_MATERIALS.includes(params?.material) ? params.material : DEFAULT_MATERIAL;
-  const { items, error } = await loadCurrentItems(material);
+  const [{ items, error }, frpCatalog] = await Promise.all([
+    loadCurrentItems(material),
+    material === "frp" ? loadFrpCatalog() : Promise.resolve([]),
+  ]);
 
   return (
     <div>
@@ -34,7 +48,7 @@ export default async function CurrentListPage({ searchParams }) {
       </div>
       <p className="mt-2 text-sm text-gray-500 dark:text-neutral-400">{t("subtitle")}</p>
 
-      <CurrentListWithExport material={material} items={items} columns={COLUMNS[material]} />
+      <CurrentListWithExport material={material} items={items} columns={COLUMNS[material]} frpCatalog={frpCatalog} />
     </div>
   );
 }

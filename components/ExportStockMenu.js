@@ -13,7 +13,7 @@ const MATERIALS = ["frp", "coatedFrp", "filler"];
 function timestamp() {
   const d = new Date();
   const pad = (v) => String(v).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 // Builds an xlsx matching the real reference export (see lib/xlsxExport.js)
