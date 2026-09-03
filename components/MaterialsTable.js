@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   columnFilteringFeature,
+  columnResizingFeature,
+  columnSizingFeature,
   columnVisibilityFeature,
   createColumnHelper,
   createFilteredRowModel,
@@ -20,16 +23,18 @@ import {
   useTable,
 } from "@tanstack/react-table";
 import { useTranslations } from "next-intl";
-import { Columns3, Maximize2, Minimize2, MoreVertical } from "lucide-react";
+import { Columns3, Download, EyeOff, Maximize2, Minimize2, MoreVertical } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import ColumnFilterHeader from "@/components/ColumnFilterHeader";
+import { downloadStockXlsx } from "@/lib/xlsxExport";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
   Table,
   TableBody,
@@ -45,6 +50,8 @@ const features = tableFeatures({
   globalFilteringFeature,
   rowSortingFeature,
   columnVisibilityFeature,
+  columnSizingFeature,
+  columnResizingFeature,
   filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
 });
@@ -106,12 +113,25 @@ export default function MaterialsTable({
   const tColumns = useTranslations("stock.columns");
   const tStock = useTranslations("stock");
   const tActions = useTranslations("stock.actions");
+  const tFilters = useTranslations("stock.filters");
+  // Most columns are labeled via a "stock.columns" translation key
+  // (headerKey), but a caller can pass a literal `label` instead - e.g.
+  // MaterialBreakdownSection's compare columns, headed by whichever two
+  // dates are picked rather than a fixed "Poprzednio/Teraz" string.
+  function columnLabel(config) {
+    return config.label ?? tColumns(config.headerKey);
+  }
   const [internalGlobalFilter, setInternalGlobalFilter] = useState("");
   const globalFilter = controlledGlobalFilter ?? internalGlobalFilter;
   const setGlobalFilter = controlledSetGlobalFilter ?? setInternalGlobalFilter;
   const [columnFilters, setColumnFilters] = useState([]);
   const [sorting, setSorting] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
+  // Only ever holds entries for columns the user actually dragged - every
+  // other column keeps its normal content-driven width (no entry here, no
+  // inline width style below), so resizing one column never changes how
+  // any other table on the site looks.
+  const [columnSizing, setColumnSizing] = useState({});
   const [orderRailFlags, setOrderRailFlags] = useState({});
   // Per-column toggle for columns with a `simpleKey` (see materials-data.js)
   // - shows row[column.simpleKey] instead of the normal value/render when
@@ -120,6 +140,28 @@ export default function MaterialsTable({
 
   function setInOrderRail(rowId, value) {
     setOrderRailFlags((prev) => ({ ...prev, [rowId]: value }));
+  }
+
+  // Seeds columnSizing with the header's *currently rendered* width before
+  // handing off to TanStack's own drag handler, which computes every
+  // subsequent delta from whatever size was on record at drag start. Without
+  // this, an untouched column (no entry in columnSizing, so it's still
+  // sized by its content) would start the drag from TanStack's built-in
+  // 150px default instead of its real on-screen width, and the column would
+  // jump the moment you grab the handle. flushSync forces the seed to
+  // commit before getResizeHandler() reads the size, since that read
+  // happens synchronously inside the same call.
+  function startResize(event, header) {
+    event.stopPropagation();
+    if (columnSizing[header.column.id] === undefined) {
+      const measured = event.currentTarget.closest("th")?.getBoundingClientRect().width;
+      if (measured) {
+        flushSync(() => {
+          setColumnSizing((prev) => ({ ...prev, [header.column.id]: measured }));
+        });
+      }
+    }
+    header.getResizeHandler()(event);
   }
 
   function toggleSimplified(columnKey) {
@@ -153,6 +195,7 @@ export default function MaterialsTable({
       columnHelper.display({
         id: "select",
         enableHiding: false,
+        enableResizing: false,
         header: ({ table }) => (
           <Checkbox
             checked={table.getIsAllRowsSelected()}
@@ -191,6 +234,7 @@ export default function MaterialsTable({
             columnHelper.display({
               id: "actions",
               enableHiding: false,
+              enableResizing: false,
               header: "",
               cell: ({ row }) => renderRowActions(row.original),
             }),
@@ -200,6 +244,7 @@ export default function MaterialsTable({
             columnHelper.display({
               id: "actions",
               enableHiding: false,
+              enableResizing: false,
               header: "",
               cell: ({ row }) => {
                 const inOrderRail = Boolean(orderRailFlags[row.id]);
@@ -244,11 +289,13 @@ export default function MaterialsTable({
       data: effectiveData,
       columns,
       getRowId: (row) => row.id,
-      state: { globalFilter, columnFilters, sorting, columnVisibility },
+      state: { globalFilter, columnFilters, sorting, columnVisibility, columnSizing },
       onGlobalFilterChange: setGlobalFilter,
       onColumnFiltersChange: setColumnFilters,
       onSortingChange: setSorting,
       onColumnVisibilityChange: setColumnVisibility,
+      onColumnSizingChange: setColumnSizing,
+      columnResizeMode: "onChange",
       globalFilterFn: filterFn_includesString,
     },
     (state) => ({
@@ -280,6 +327,42 @@ export default function MaterialsTable({
   const visibleRows = showOnlySelected ? table.getRowModel().rows.filter((row) => row.getIsSelected()) : table.getRowModel().rows;
   const hideableColumns = table.getAllLeafColumns().filter((col) => col.getCanHide());
 
+  // Exports exactly what's on screen right now: visible columns in their
+  // current order (respects the "Kolumny" toggle), and whichever rows
+  // getRowModel() currently returns (respects filters, sorting, and
+  // showOnlySelected) - not a separate "export everything" path.
+  const [exporting, setExporting] = useState(false);
+  async function exportToExcel() {
+    const exportColumns = table.getVisibleLeafColumns().filter((col) => col.id !== "select" && col.id !== "actions");
+    const headers = exportColumns.map((col) => {
+      const config = columnConfig.find((c) => c.key === col.id);
+      return config ? columnLabel(config) : col.id;
+    });
+    const rows = visibleRows.map((row) =>
+      exportColumns.map((col) => {
+        const config = columnConfig.find((c) => c.key === col.id);
+        const value = row.original[col.id];
+        if (config?.type === "boolean") return value ? tColumns("yes") : tColumns("no");
+        if (config?.type === "datetime") {
+          const date = new Date(value);
+          return value && !Number.isNaN(date.getTime())
+            ? new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short" }).format(date)
+            : "";
+        }
+        return value ?? "";
+      })
+    );
+    const pad = (v) => String(v).padStart(2, "0");
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+    setExporting(true);
+    try {
+      await downloadStockXlsx({ fileName: `eksport_${timestamp}.xlsx`, sheets: [{ sheetName: "Dane", headers, rows }] });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   // Distinguishes *why* the table is empty - a genuinely empty dataset
   // reads very differently from "your filters hid everything" or "the
   // fetch that feeds this table failed" (isLoading/loadError are only
@@ -304,56 +387,92 @@ export default function MaterialsTable({
               {headerGroup.headers.map((header) => {
                 const config = columnConfig.find((c) => c.key === header.column.id);
                 const isMultiselect = config?.filterFn === "multiselect";
+                // The actions column is sticky on both axes (top for the
+                // header, right so it survives horizontal scroll on wide
+                // tables) - it needs a higher z-index than the plain
+                // top-sticky cells so it stays on top at that corner.
+                const isActionsCol = header.column.id === "actions";
+                const resizedWidth = columnSizing[header.column.id];
                 return (
                   <TableHead
                     key={header.id}
-                    className={`sticky top-0 z-10 h-11 bg-navy-950 px-4 text-sm font-semibold text-white dark:bg-navy-500 ${config?.className ?? ""}`}
+                    style={resizedWidth ? { width: resizedWidth, minWidth: resizedWidth, maxWidth: resizedWidth } : undefined}
+                    className={`sticky top-0 h-11 bg-navy-950 px-4 text-sm font-semibold text-white dark:bg-navy-500 ${
+                      isActionsCol ? "right-0 z-20 border-l border-navy-900 dark:border-navy-600" : "relative z-10"
+                    } ${config?.className ?? ""}`}
                   >
-                    <div className="flex items-center gap-1">
-                      {config?.filterFn ? (
-                        <ColumnFilterHeader
-                          column={header.column}
-                          label={tColumns(config.headerKey)}
-                          variant={
-                            isMultiselect
-                              ? "multiselect"
-                              : config.type === "boolean"
-                              ? "boolean"
-                              : config.filterFn === "inNumberRange"
-                              ? "range"
-                              : "text"
-                          }
-                          options={
-                            isMultiselect
-                              ? [...new Set(effectiveData.map((row) => String(row[config.key] ?? "")))].sort((a, b) =>
-                                  a.localeCompare(b, undefined, { numeric: true })
-                                )
-                              : undefined
-                          }
-                          sortable={Boolean(config.sortable)}
-                        />
-                      ) : (
-                        <table.FlexRender header={header} />
+                    <ContextMenu>
+                      <ContextMenuTrigger className="flex flex-1 items-center gap-1">
+                        {config?.filterFn ? (
+                          <ColumnFilterHeader
+                            column={header.column}
+                            label={columnLabel(config)}
+                            variant={
+                              isMultiselect
+                                ? "multiselect"
+                                : config.type === "boolean"
+                                ? "boolean"
+                                : config.filterFn === "inNumberRange"
+                                ? "range"
+                                : "text"
+                            }
+                            options={
+                              isMultiselect
+                                ? [...new Set(effectiveData.map((row) => String(row[config.key] ?? "")))].sort((a, b) =>
+                                    a.localeCompare(b, undefined, { numeric: true })
+                                  )
+                                : undefined
+                            }
+                            sortable={Boolean(config.sortable)}
+                          />
+                        ) : (
+                          <table.FlexRender header={header} />
+                        )}
+                        {config?.simpleKey && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSimplified(config.key)}
+                            title={simplifiedColumns[config.key] ? tActions("showFull") : tActions("showSimplified")}
+                            className={`shrink-0 rounded-md p-1 transition-colors ${
+                              simplifiedColumns[config.key]
+                                ? "bg-white/20 text-white"
+                                : "text-white/60 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            {simplifiedColumns[config.key] ? (
+                              <Maximize2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <Minimize2 className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </ContextMenuTrigger>
+                      {header.column.getCanHide() && (
+                        <ContextMenuContent>
+                          <ContextMenuItem onClick={() => header.column.toggleVisibility(false)}>
+                            <EyeOff className="h-4 w-4" />
+                            {tFilters("hideColumn")}
+                          </ContextMenuItem>
+                        </ContextMenuContent>
                       )}
-                      {config?.simpleKey && (
-                        <button
-                          type="button"
-                          onClick={() => toggleSimplified(config.key)}
-                          title={simplifiedColumns[config.key] ? tActions("showFull") : tActions("showSimplified")}
-                          className={`shrink-0 rounded-md p-1 transition-colors ${
-                            simplifiedColumns[config.key]
-                              ? "bg-white/20 text-white"
-                              : "text-white/60 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          {simplifiedColumns[config.key] ? (
-                            <Maximize2 className="h-3.5 w-3.5" />
-                          ) : (
-                            <Minimize2 className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      )}
-                    </div>
+                    </ContextMenu>
+                    {header.column.getCanResize() && (
+                      <div
+                        onMouseDown={(event) => startResize(event, header)}
+                        onTouchStart={(event) => startResize(event, header)}
+                        onClick={(event) => event.stopPropagation()}
+                        onDoubleClick={() =>
+                          setColumnSizing((prev) => {
+                            const { [header.column.id]: _removed, ...rest } = prev;
+                            return rest;
+                          })
+                        }
+                        title={tActions("resetColumnWidth")}
+                        className={`absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none ${
+                          header.column.getIsResizing() ? "bg-white/40" : "hover:bg-white/20"
+                        }`}
+                      />
+                    )}
                   </TableHead>
                 );
               })}
@@ -371,28 +490,48 @@ export default function MaterialsTable({
               </TableCell>
             </TableRow>
           ) : (
-            visibleRows.map((row, index) => (
+            visibleRows.map((row, index) => {
+              const stripeCls = rowClassName?.(row.original) || (index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : "bg-white dark:bg-neutral-900");
+              const isSelected = row.getIsSelected();
+              // The sticky actions cell can't reuse stripeCls as-is: its
+              // "/60"/"/40" alpha means the row content that has scrolled
+              // out from underneath the (fixed-position) cell would still
+              // show through, since a sticky element isn't actually
+              // clipped by the rest of the row - it needs a fully opaque
+              // background of its own. Kept a single flat color across
+              // every row (not alternating with the stripe) so the frozen
+              // column reads as one consistent strip, not columns.
+              const stickyBgCls = isSelected ? "!bg-navy-100 dark:!bg-navy-900" : "bg-white dark:bg-neutral-900";
+              return (
               <TableRow
                 key={row.id}
-                data-state={row.getIsSelected() ? "selected" : undefined}
+                data-state={isSelected ? "selected" : undefined}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                className={`border-gray-100 dark:border-neutral-800 ${onRowClick ? "cursor-pointer" : ""} ${
-                  rowClassName?.(row.original) || (index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : "")
-                } data-[state=selected]:bg-navy-50 dark:data-[state=selected]:bg-navy-950/40 hover:bg-navy-50/60 dark:hover:bg-neutral-800/60`}
+                className={`group border-gray-100 dark:border-neutral-800 ${onRowClick ? "cursor-pointer" : ""} ${stripeCls} data-[state=selected]:bg-navy-50 dark:data-[state=selected]:bg-navy-950/40 hover:bg-navy-50/60 dark:hover:bg-neutral-800/60`}
               >
                 {row.getVisibleCells().map((cell) => {
                   const config = columnConfig.find((c) => c.key === cell.column.id);
+                  const isActionsCol = cell.column.id === "actions";
+                  const resizedWidth = columnSizing[cell.column.id];
                   return (
                     <TableCell
                       key={cell.id}
-                      className={`px-4 py-2.5 text-gray-700 dark:text-neutral-300 ${config?.className ?? ""}`}
+                      style={resizedWidth ? { width: resizedWidth, minWidth: resizedWidth, maxWidth: resizedWidth } : undefined}
+                      className={`px-4 py-2.5 text-gray-700 dark:text-neutral-300 ${
+                        isActionsCol
+                          ? `sticky right-0 z-10 border-l border-gray-100 dark:border-neutral-800 ${stickyBgCls} group-hover:!bg-navy-100 dark:group-hover:!bg-neutral-700`
+                          : resizedWidth
+                          ? "overflow-hidden text-ellipsis whitespace-nowrap"
+                          : ""
+                      } ${config?.className ?? ""}`}
                     >
                       <table.FlexRender cell={cell} />
                     </TableCell>
                   );
                 })}
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>
@@ -416,6 +555,10 @@ export default function MaterialsTable({
               </Button>
             </>
           )}
+          <Button variant="outline" size="sm" onClick={exportToExcel} disabled={exporting}>
+            <Download className="h-4 w-4" />
+            {exporting ? tActions("exporting") : tActions("exportExcel")}
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -434,7 +577,7 @@ export default function MaterialsTable({
                     checked={col.getIsVisible()}
                     onCheckedChange={(value) => col.toggleVisibility(Boolean(value))}
                   >
-                    {config ? tColumns(config.headerKey) : col.id}
+                    {config ? columnLabel(config) : col.id}
                   </DropdownMenuCheckboxItem>
                 );
               })}

@@ -23,10 +23,13 @@ function fromDateKey(key) {
 // Lets the user pick which stock-take session to view: a button showing the
 // selected date opens a calendar where only days that actually have a stock
 // (availableDates, from GET /stocks) are selectable - everything else is
-// disabled. Picking a day sets ?date=YYYY-MM-DD, which the server component
-// (app/dashboard/stock/page.js) uses to load that session instead of the
-// latest one.
-export default function StockDatePicker({ availableDates, selectedDate, paramName = "date", placeholder }) {
+// disabled. By default picking a day sets ?<paramName>=YYYY-MM-DD, which a
+// server component (e.g. app/dashboard/stock/page.js, the balance page)
+// uses to load that session instead of the latest one. Pass `onSelect`
+// instead to run this fully client-side (e.g. MaterialBreakdownSection's
+// compare-dates, which re-slices data already in memory - no URL/refetch
+// needed there).
+export default function StockDatePicker({ availableDates, selectedDate, paramName = "date", placeholder, onSelect }) {
   const t = useTranslations("stock");
   const locale = useLocale();
   const router = useRouter();
@@ -40,9 +43,14 @@ export default function StockDatePicker({ availableDates, selectedDate, paramNam
 
   function handleSelect(date) {
     if (!date) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(paramName, toDateKey(date));
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    const dateKey = toDateKey(date);
+    if (onSelect) {
+      onSelect(dateKey);
+    } else {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(paramName, dateKey);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
     setOpen(false);
   }
 

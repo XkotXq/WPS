@@ -23,6 +23,9 @@
     "materials": "Materials",
     "materialsList": "Materials List",
     "materialsHistory": "Operation History",
+    "ordersCip": "CIP Orders",
+    "ordersWms": "WMS Issues",
+    "ordersWmsLists": "Issue lists",
     "search": "Search",
     "searchPlaceholder": "Search...",
     "collapse": "Collapse navigation",
@@ -127,7 +130,10 @@
       "inOrderRail": "In order rail",
       "showSimplified": "Show simplified value",
       "showFull": "Show full name",
-      "columns": "Columns"
+      "columns": "Columns",
+      "resetColumnWidth": "Drag to resize - double-click to reset to default",
+      "exportExcel": "Export to Excel",
+      "exporting": "Exporting…"
     },
     "filters": {
       "title": "Filters",
@@ -143,7 +149,8 @@
       "searchOptions": "Search...",
       "selectAll": "Select all",
       "selectNone": "Select none",
-      "noOptions": "No matches"
+      "noOptions": "No matches",
+      "hideColumn": "Hide column"
     }
   },
   "stockCheck": {
@@ -198,13 +205,10 @@
     "colorWhite": "White",
     "colorBlack": "Black",
     "breakdownTitle": "{material} by item",
+    "compareFrom": "From",
+    "compareTo": "To",
     "clickItemHint": "Click a row to see that item's trend",
-    "itemTrendTitle": "{item} - recent stocks",
-    "columnItem": "Item number",
-    "columnDiameter": "Diameter",
-    "columnXbz": "XB/Z",
-    "columnColor": "Color",
-    "columnDelta": "Δ"
+    "itemTrendTitle": "{item} - recent stocks"
   },
   "stockFrpDatabase": {
     "title": "FRP Database",
@@ -230,11 +234,41 @@
     "title": "Materials List",
     "subtitle": "Current temporary-storage warehouse inventory, live from CIP.",
     "fetchError": "Failed to fetch data from CIP.",
-    "count": "Items: {count}"
+    "count": "Items: {count}",
+    "actions": {
+      "edit": "Edit",
+      "issue": "Issue"
+    },
+    "editPanel": {
+      "title": "Edit material",
+      "description": "View and edit the material's data.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "note": "Saving will be available soon."
+    },
+    "issuePanel": {
+      "title": "Issue material",
+      "description": "Issue material from the temporary storage warehouse.",
+      "quantityLabel": "Quantity to issue",
+      "noteLabel": "Note",
+      "requiredQuantity": "Enter a valid quantity to issue.",
+      "maxQuantity": "Quantity can't exceed the available specifications ({max}).",
+      "confirm": "Issue",
+      "cancel": "Cancel",
+      "note": "Saving to the system will be available soon."
+    }
   },
   "materialsReports": {
     "title": "Reports",
     "subtitle": "Materials reports will be shown here. This section is coming soon."
+  },
+  "ordersCip": {
+    "title": "CIP Orders",
+    "subtitle": "CIP orders will be shown here. This section is coming soon."
+  },
+  "ordersWms": {
+    "title": "WMS Issues",
+    "subtitle": "Issues created in WMS will be shown here. This section is coming soon."
   },
   "materialsHistory": {
     "title": "Operation History",

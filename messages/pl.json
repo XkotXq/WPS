@@ -23,6 +23,9 @@
     "materials": "Materiały",
     "materialsList": "Lista materiałów",
     "materialsHistory": "Historia operacji",
+    "ordersCip": "Zamówienia CIP",
+    "ordersWms": "Wydania WMS",
+    "ordersWmsLists": "Listy wydań",
     "search": "Szukaj",
     "searchPlaceholder": "Szukaj...",
     "collapse": "Zwiń nawigację",
@@ -127,7 +130,10 @@
       "inOrderRail": "W szynie do zamówień",
       "showSimplified": "Pokaż uproszczoną wartość",
       "showFull": "Pokaż pełną nazwę",
-      "columns": "Kolumny"
+      "columns": "Kolumny",
+      "resetColumnWidth": "Przeciągnij, aby zmienić szerokość - kliknij dwukrotnie, aby przywrócić domyślną",
+      "exportExcel": "Eksportuj do Excel",
+      "exporting": "Eksportowanie…"
     },
     "filters": {
       "title": "Filtry",
@@ -143,7 +149,8 @@
       "searchOptions": "Szukaj...",
       "selectAll": "Zaznacz wszystkie",
       "selectNone": "Odznacz wszystkie",
-      "noOptions": "Brak wyników"
+      "noOptions": "Brak wyników",
+      "hideColumn": "Ukryj kolumnę"
     }
   },
   "stockCheck": {
@@ -198,13 +205,10 @@
     "colorWhite": "Biały",
     "colorBlack": "Czarny",
     "breakdownTitle": "{material} wg itemu",
+    "compareFrom": "Od",
+    "compareTo": "Do",
     "clickItemHint": "Kliknij wiersz, aby zobaczyć trend itemu",
-    "itemTrendTitle": "{item} - ostatnie stocki",
-    "columnItem": "Item number",
-    "columnDiameter": "Średnica",
-    "columnXbz": "XB/Z",
-    "columnColor": "Kolor",
-    "columnDelta": "Δ"
+    "itemTrendTitle": "{item} - ostatnie stocki"
   },
   "stockFrpDatabase": {
     "title": "Baza FRP",
@@ -230,11 +234,41 @@
     "title": "Lista materiałów",
     "subtitle": "Stan materiałów z CIP",
     "fetchError": "Nie udało się pobrać danych z CIP.",
-    "count": "Pozycji: {count}"
+    "count": "Pozycji: {count}",
+    "actions": {
+      "edit": "Edytuj",
+      "issue": "Wydaj"
+    },
+    "editPanel": {
+      "title": "Edytuj materiał",
+      "description": "Podgląd i edycja danych materiału.",
+      "save": "Zapisz",
+      "cancel": "Anuluj",
+      "note": "Zapis będzie dostępny wkrótce."
+    },
+    "issuePanel": {
+      "title": "Wydaj materiał",
+      "description": "Wydanie materiału z magazynu tymczasowego.",
+      "quantityLabel": "Ilość wydania",
+      "noteLabel": "Notatka",
+      "requiredQuantity": "Podaj poprawną ilość wydania.",
+      "maxQuantity": "Ilość nie może przekraczać dostępnej specyfikacji ({max}).",
+      "confirm": "Wydaj",
+      "cancel": "Anuluj",
+      "note": "Zapis w systemie będzie dostępny wkrótce."
+    }
   },
   "materialsReports": {
     "title": "Raporty",
     "subtitle": "Tutaj pojawią się raporty materiałowe. Ta sekcja jest w przygotowaniu."
+  },
+  "ordersCip": {
+    "title": "Zamówienia CIP",
+    "subtitle": "Tutaj pojawią się zamówienia z CIP. Ta sekcja jest w przygotowaniu."
+  },
+  "ordersWms": {
+    "title": "Wydania WMS",
+    "subtitle": "Tutaj pojawią się wydania tworzone w WMS. Ta sekcja jest w przygotowaniu."
   },
   "materialsHistory": {
     "title": "Historia operacji",

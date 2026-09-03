@@ -10,6 +10,8 @@ import {
   LogOut,
   Package,
   ClipboardList,
+  ShoppingCart,
+  PackageMinus,
   Search,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,6 +27,7 @@ const SIDEBAR_COLLAPSED_KEY = "wms-sidebar-collapsed";
 const RECENT_PAGES_KEY = "wms-recent-pages";
 const STOCK_BASE_PATH = "/dashboard/stock";
 const MATERIALS_BASE_PATH = "/dashboard/materials-list";
+const ORDERS_WMS_BASE_PATH = "/dashboard/orders/wms";
 const MAX_RECENT_PAGES = 5;
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
@@ -36,6 +39,7 @@ export default function DashboardLayout({ children }) {
   const [materialsOpen, setMaterialsOpen] = useState(() =>
     pathname.startsWith(MATERIALS_BASE_PATH)
   );
+  const [ordersWmsOpen, setOrdersWmsOpen] = useState(() => pathname.startsWith(ORDERS_WMS_BASE_PATH));
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState(null);
@@ -94,6 +98,8 @@ export default function DashboardLayout({ children }) {
     { href: "/dashboard/materials-list/history", label: tNav("materialsHistory") },
     { href: "/dashboard/materials-list/reports", label: tNav("reports") },
   ];
+
+  const ordersWmsChildren = [{ href: "/dashboard/orders/wms", label: tNav("ordersWmsLists") }];
 
   return (
     <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-neutral-950">
@@ -163,6 +169,26 @@ export default function DashboardLayout({ children }) {
               open={materialsOpen}
               onToggle={() => setMaterialsOpen((prev) => !prev)}
               items={materialsChildren}
+            />
+
+            <Link
+              href="/dashboard/orders/cip"
+              title={collapsed ? tNav("ordersCip") : undefined}
+              className={navLinkClasses(pathname === "/dashboard/orders/cip", collapsed)}
+            >
+              <ShoppingCart className="h-5 w-5 shrink-0" />
+              {!collapsed && tNav("ordersCip")}
+            </Link>
+
+            <NavGroup
+              icon={PackageMinus}
+              label={tNav("ordersWms")}
+              basePath={ORDERS_WMS_BASE_PATH}
+              pathname={pathname}
+              collapsed={collapsed}
+              open={ordersWmsOpen}
+              onToggle={() => setOrdersWmsOpen((prev) => !prev)}
+              items={ordersWmsChildren}
             />
           </nav>
 

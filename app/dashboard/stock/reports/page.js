@@ -54,19 +54,25 @@ async function loadMaterialTrend(material, format) {
   const rows = await api.getMaterialTrend(material);
   const series = SPLIT_SERIES[material];
 
-  const versionsMap = new Map(); // versionId -> { dateKey, label, totalMeters, splitCounts }
+  // Keyed by calendar day (not row.versionId): two check-in sessions for
+  // the same material on the same day must merge into one point/column -
+  // otherwise dateColumns ends up with two entries sharing the same date
+  // key, which React then refuses to render as siblings ("two children
+  // with the same key"). entry.byDate below already summed same-day rows
+  // this way; versionsMap just needs to match it.
+  const versionsMap = new Map(); // dateKey -> { label, totalMeters, splitCounts }
   const itemsMap = new Map();
 
   for (const row of rows) {
-    if (!versionsMap.has(row.versionId)) {
-      versionsMap.set(row.versionId, {
-        dateKey: dateKeyFromISO(row.performedAt),
+    const dateKey = dateKeyFromISO(row.performedAt);
+    if (!versionsMap.has(dateKey)) {
+      versionsMap.set(dateKey, {
         label: format.dateTime(new Date(row.performedAt), { day: "2-digit", month: "2-digit", year: "numeric" }),
         totalMeters: 0,
         splitCounts: Object.fromEntries(series.map((s) => [s.key, 0])),
       });
     }
-    const version = versionsMap.get(row.versionId);
+    const version = versionsMap.get(dateKey);
     version.totalMeters += row.totalLength;
     if (row.splitValue in version.splitCounts) version.splitCounts[row.splitValue] += row.drumCount;
 
@@ -79,13 +85,13 @@ async function loadMaterialTrend(material, format) {
       });
     }
     const entry = itemsMap.get(row.groupKey);
-    entry.byDate.set(version.dateKey, (entry.byDate.get(version.dateKey) || 0) + row.totalLength);
+    entry.byDate.set(dateKey, (entry.byDate.get(dateKey) || 0) + row.totalLength);
   }
 
   // rows arrive ordered by performed_at ASC, so Map insertion order (and
   // therefore this) is already chronological.
-  const points = [...versionsMap.values()].map((v) => ({
-    dateKey: v.dateKey,
+  const points = [...versionsMap.entries()].map(([dateKey, v]) => ({
+    dateKey,
     label: v.label,
     totalKm: v.totalMeters / 1000,
     splitCounts: v.splitCounts,
