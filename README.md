@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# wps
 
-## Getting Started
+Internal WMS dashboard for FRP / coated-FRP / filler warehouse
+materials: stock lists, balances between stock rounds, per-item trend
+reports, the shared FRP catalog, CIP-integrated materials management,
+and operation history.
 
-First, run the development server:
+Part of a 3-app warehouse system:
+
+- **wps** (this app) — the internal dashboard.
+- [**stock**](../stock) — consumer-facing app warehouse staff use to do
+  the physical stock check/count.
+- [**wpsApi**](../wpsApi) — the shared Express/Postgres backend both
+  apps talk to.
+
+## Features
+
+- **Lista stocków** / **Aktualna lista** — browse a stock round or the
+  live current inventory, with per-column filtering, sorting, column
+  visibility, resizable columns, and Excel export on every table.
+- **Bilans** — compare drum-level state between any two stock rounds.
+- **Raporty** — length/drum-count trends per material, and a per-item
+  breakdown table comparing any two picked dates.
+- **Baza FRP** — manage the shared FRP item catalog.
+- **Materiały** — live inventory from the legacy CIP system
+  (temporary-storage warehouse), operation history, and per-item
+  quantity-over-time charts.
+- **Zamówienia CIP** / **Wydania WMS** — placeholders for upcoming
+  order/issue-tracking features.
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Environment variables (`.env.local`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Purpose |
+| --- | --- |
+| `API_BASE_URL` | Base URL of the `wpsApi` backend (e.g. `http://localhost:4000`) |
+| `API_TOKEN` | Shared bearer token, must match `API_TOKEN` in `wpsApi`'s `.env` |
+| `SKIP_CIP_AUTH` | `true` to bypass the CIP login screen in development (ignored in production builds); also swaps live CIP materials data for a small test fixture |
 
-## Learn More
+### Scripts
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run dev` — start the dev server
+- `npm run build` / `npm run start` — production build and serve
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Next.js (App Router, Server Components) · React · Tailwind CSS ·
+shadcn/`@base-ui` components · TanStack Table · Recharts · next-intl
+(PL/EN) · `xlsx-js-style` (Excel export)
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [`AGENTS.md`](./AGENTS.md) for implementation details and gotchas.
