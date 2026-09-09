@@ -1,7 +1,7 @@
 {
   "login": {
     "title": "Sign in",
-    "subtitle": "Warehouse Management System",
+    "subtitle": "Stock Manager — warehouse dashboard",
     "emailLabel": "Login",
     "emailPlaceholder": "CIP login",
     "passwordLabel": "Password",
@@ -20,9 +20,12 @@
     "balance": "Balance",
     "reports": "Reports",
     "frpDatabase": "FRP Database",
-    "materials": "Materials",
-    "materialsList": "Materials List",
-    "materialsHistory": "Operation History",
+    "materials": "CIP Materials",
+    "materialsList": "Materials List from CIP",
+    "materialsHistory": "Operation History from CIP",
+    "materialsSm": "SM Materials",
+    "materialsListSm": "SM Materials List",
+    "materialsHistorySm": "SM Operation History",
     "ordersCip": "CIP Orders",
     "ordersWms": "WMS Issues",
     "ordersWmsLists": "Issue lists",
@@ -269,6 +272,97 @@
   "ordersWms": {
     "title": "WMS Issues",
     "subtitle": "Issues created in WMS will be shown here. This section is coming soon."
+  },
+  "materialsListSm": {
+    "title": "SM Materials List",
+    "addReceipt": "Add receipt",
+    "viewMode": {
+      "grouped": "Grouped",
+      "flat": "List"
+    },
+    "tableFilters": {
+      "apply": "Apply",
+      "clear": "Clear",
+      "namePlaceholder": "Search by name...",
+      "notePlaceholder": "Search by note...",
+      "quantityMin": "Min",
+      "quantityMax": "Max"
+    },
+    "columns": {
+      "itemNo": "Item no.",
+      "itemName": "Name",
+      "materialNumber": "Material number",
+      "unitId": "Unit number",
+      "quantity": "Quantity",
+      "location": "Location",
+      "note": "Note",
+      "cipStatus": "CIP match"
+    },
+    "status": {
+      "match": "Matches",
+      "mismatch": "Mismatch"
+    },
+    "actions": {
+      "edit": "Edit",
+      "issue": "Issue"
+    },
+    "receivePanel": {
+      "title": "Add receipt",
+      "description": "Register a new material unit received into the temporary-storage warehouse (MT).",
+      "itemNoLabel": "Item number",
+      "itemNameLabel": "Material name",
+      "quantityLabel": "Quantity",
+      "locationLabel": "Location",
+      "unitIdLabel": "Unit number",
+      "unitIdPlaceholder": "e.g. SZP-2234",
+      "note": "Eventually: quantity and location will be sent to CIP via its API, while the unit number will only be stored here, in Stock Manager.",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "editPanel": {
+      "title": "Edit",
+      "description": "Correct the material's data.",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "issuePanel": {
+      "title": "Issue unit",
+      "description": "Issue a single unit from the temporary-storage warehouse.",
+      "quantityLabel": "Quantity to issue",
+      "requiredQuantity": "Enter a valid quantity to issue.",
+      "maxQuantity": "Quantity can't exceed the available amount ({max}).",
+      "confirm": "Issue",
+      "cancel": "Cancel",
+      "note": "Issuing removes this unit from the list (in the final version: from CIP too).",
+      "noteAggregate": "The entered quantity will be deducted from stock (in the final version: from CIP too)."
+    },
+    "bulkIssuePanel": {
+      "trigger": "Issue selected ({count})",
+      "title": "Issue selected materials",
+      "description": "{count} items selected. Materials issued in full already show their full quantity - for materials issued partially, enter your own amount.",
+      "confirm": "Issue ({count})"
+    },
+    "issueGroupPanel": {
+      "title": "Issue units",
+      "description": "Choose which units of this material should be issued.",
+      "selectAll": "Select all",
+      "note": "Issuing removes the selected units from the list (in the final version: from CIP too).",
+      "confirm": "Issue ({count})"
+    },
+    "toast": {
+      "received": "Received {itemName} ({quantity}).",
+      "issued": "Issued {itemName} ({quantity}).",
+      "issuedUnits": "Issued {count} units of {itemName}.",
+      "issuedBulk": "Issued {count} items."
+    },
+    "notePanel": {
+      "noteLabel": "Note",
+      "placeholder": "e.g. Delivery delayed, check on next receipt..."
+    }
+  },
+  "materialsHistorySm": {
+    "title": "SM Operation History",
+    "subtitle": "The operation history tracked by Stock Manager will be shown here. This section is coming soon."
   },
   "materialsHistory": {
     "title": "Operation History",

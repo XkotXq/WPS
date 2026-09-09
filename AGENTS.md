@@ -34,7 +34,7 @@ unreachable — it is hard-disabled outside `NODE_ENV=production` builds
 (see `lib/cipSession.js`), so it can never silently accept any
 credentials in a real deployment. Do not remove that production guard.
 When that bypass session (`session.token === "local-bypass"`) is active,
-`app/dashboard/materials-list/page.js` swaps the real CIP inventory
+`app/dashboard/materials-list-cip/page.js` swaps the real CIP inventory
 fetch for a fixed `TEST_RECORDS` fixture instead of hitting CIP (which
 is unreachable under the bypass anyway) - keep that in sync with
 `CipMaterialsTable`'s row shape if that shape changes.

@@ -10,7 +10,7 @@ const PAGE_SIZE = 500;
 // this isn't limited to whatever the current 500-row page happens to hold.
 const FILTER_KEYS = ["itemNo", "itemName", "operation", "handleByAfter", "locationCodeAfter"];
 
-// Same server-side-fetch pattern as ../page.js (materials-list/page.js) -
+// Same server-side-fetch pattern as ../page.js (materials-list-cip/page.js) -
 // captured from the page at
 // http://10.96.9.2/#/materialManage/rawMaterialInOut/inventory/index
 // (the "history" action on a row there).

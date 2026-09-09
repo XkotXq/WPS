@@ -17,8 +17,8 @@ const satoshi = localFont({
 });
 
 export const metadata = {
-  title: "WMS",
-  description: "Warehouse Management System",
+  title: "Stock Manager",
+  description: "Internal stock management dashboard for FRP, coated-FRP and filler materials.",
 };
 
 export default async function RootLayout({ children }) {

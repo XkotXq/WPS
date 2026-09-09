@@ -154,6 +154,7 @@ export default function MaterialBreakdownSection({ title, material, items, dateC
           onGlobalFilterChange={setSearch}
           onRowClick={(row) => toggleItem(row.id)}
           rowClassName={(row) => (row.id === selectedKey ? "bg-navy-50 dark:bg-navy-950/40" : "")}
+          bleed={false}
         />
       </div>
     </div>

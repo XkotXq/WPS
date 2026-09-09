@@ -87,12 +87,12 @@ export default function ColumnFilterHeader({ column, label, variant = "text", so
         render={
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center gap-1.5 text-left text-white"
+            className="flex w-full cursor-pointer items-center gap-1.5 text-left text-gray-500 dark:text-neutral-400"
           >
             <span>{label}</span>
-            {sortDir === "asc" && <ArrowUpAZ className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
-            {sortDir === "desc" && <ArrowDownZA className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
-            <Filter className={`h-3.5 w-3.5 shrink-0 ${isFiltered ? "text-amber-300" : "text-white/60"}`} />
+            {sortDir === "asc" && <ArrowUpAZ className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />}
+            {sortDir === "desc" && <ArrowDownZA className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />}
+            <Filter className={`h-3.5 w-3.5 shrink-0 ${isFiltered ? "text-amber-600 dark:text-amber-400" : "text-gray-400 dark:text-neutral-500"}`} />
           </button>
         }
       />

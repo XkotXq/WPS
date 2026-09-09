@@ -43,7 +43,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-navy-950 dark:bg-navy-500 text-lg font-bold text-white">
-            WMS
+            SM
           </div>
           <h1 className="text-2xl font-semibold text-navy-950 dark:text-white">{t("title")}</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-neutral-400">{t("subtitle")}</p>

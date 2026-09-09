@@ -12,6 +12,7 @@ import {
   ClipboardList,
   ShoppingCart,
   PackageMinus,
+  Boxes,
   Search,
   PanelLeftClose,
   PanelLeftOpen,
@@ -26,7 +27,8 @@ import { logoutCip, getCipSession } from "@/lib/cipSession";
 const SIDEBAR_COLLAPSED_KEY = "wms-sidebar-collapsed";
 const RECENT_PAGES_KEY = "wms-recent-pages";
 const STOCK_BASE_PATH = "/dashboard/stock";
-const MATERIALS_BASE_PATH = "/dashboard/materials-list";
+const MATERIALS_BASE_PATH = "/dashboard/materials-list-cip";
+const MATERIALS_SM_BASE_PATH = "/dashboard/materials-list-sm";
 const ORDERS_WMS_BASE_PATH = "/dashboard/orders/wms";
 const MAX_RECENT_PAGES = 5;
 export default function DashboardLayout({ children }) {
@@ -38,6 +40,9 @@ export default function DashboardLayout({ children }) {
   const [stockOpen, setStockOpen] = useState(() => pathname.startsWith(STOCK_BASE_PATH));
   const [materialsOpen, setMaterialsOpen] = useState(() =>
     pathname.startsWith(MATERIALS_BASE_PATH)
+  );
+  const [materialsSmOpen, setMaterialsSmOpen] = useState(() =>
+    pathname.startsWith(MATERIALS_SM_BASE_PATH)
   );
   const [ordersWmsOpen, setOrdersWmsOpen] = useState(() => pathname.startsWith(ORDERS_WMS_BASE_PATH));
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
@@ -94,9 +99,14 @@ export default function DashboardLayout({ children }) {
   ];
 
   const materialsChildren = [
-    { href: "/dashboard/materials-list", label: tNav("materialsList") },
-    { href: "/dashboard/materials-list/history", label: tNav("materialsHistory") },
-    { href: "/dashboard/materials-list/reports", label: tNav("reports") },
+    { href: "/dashboard/materials-list-cip", label: tNav("materialsList") },
+    { href: "/dashboard/materials-list-cip/history-cip", label: tNav("materialsHistory") },
+    { href: "/dashboard/materials-list-cip/reports", label: tNav("reports") },
+  ];
+
+  const materialsSmChildren = [
+    { href: "/dashboard/materials-list-sm", label: tNav("materialsListSm") },
+    { href: "/dashboard/materials-list-sm/history-sm", label: tNav("materialsHistorySm") },
   ];
 
   const ordersWmsChildren = [{ href: "/dashboard/orders/wms", label: tNav("ordersWmsLists") }];
@@ -111,10 +121,10 @@ export default function DashboardLayout({ children }) {
         >
           <div className="flex items-center gap-2 px-2 py-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-950 dark:bg-navy-500 text-xs font-bold text-white">
-              WMS
+              SM
             </div>
             {!collapsed && (
-              <span className="text-sm font-semibold text-navy-950 dark:text-white">WMS</span>
+              <span className="text-sm font-semibold text-navy-950 dark:text-white">Stock Manager</span>
             )}
           </div>
 
@@ -169,6 +179,17 @@ export default function DashboardLayout({ children }) {
               open={materialsOpen}
               onToggle={() => setMaterialsOpen((prev) => !prev)}
               items={materialsChildren}
+            />
+
+            <NavGroup
+              icon={Boxes}
+              label={tNav("materialsSm")}
+              basePath={MATERIALS_SM_BASE_PATH}
+              pathname={pathname}
+              collapsed={collapsed}
+              open={materialsSmOpen}
+              onToggle={() => setMaterialsSmOpen((prev) => !prev)}
+              items={materialsSmChildren}
             />
 
             <Link

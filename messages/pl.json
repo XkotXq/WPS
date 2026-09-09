@@ -1,7 +1,7 @@
 {
   "login": {
     "title": "Zaloguj się",
-    "subtitle": "System Zarządzania Magazynem",
+    "subtitle": "Stock Manager — panel magazynowy",
     "emailLabel": "Login",
     "emailPlaceholder": "Login CIP",
     "passwordLabel": "Hasło",
@@ -20,9 +20,12 @@
     "balance": "Bilans",
     "reports": "Raporty",
     "frpDatabase": "Baza FRP",
-    "materials": "Materiały",
-    "materialsList": "Lista materiałów",
-    "materialsHistory": "Historia operacji",
+    "materials": "Materiały CIP",
+    "materialsList": "Lista materiałów z CIP",
+    "materialsHistory": "Historia operacji z CIP",
+    "materialsSm": "Materiały SM",
+    "materialsListSm": "Lista materiałów SM",
+    "materialsHistorySm": "Historia operacji SM",
     "ordersCip": "Zamówienia CIP",
     "ordersWms": "Wydania WMS",
     "ordersWmsLists": "Listy wydań",
@@ -269,6 +272,97 @@
   "ordersWms": {
     "title": "Wydania WMS",
     "subtitle": "Tutaj pojawią się wydania tworzone w WMS. Ta sekcja jest w przygotowaniu."
+  },
+  "materialsListSm": {
+    "title": "Lista materiałów SM",
+    "addReceipt": "Dodaj przyjęcie",
+    "viewMode": {
+      "grouped": "Pogrupowane",
+      "flat": "Lista"
+    },
+    "tableFilters": {
+      "apply": "Zastosuj",
+      "clear": "Wyczyść",
+      "namePlaceholder": "Szukaj po nazwie...",
+      "notePlaceholder": "Szukaj po notatce...",
+      "quantityMin": "Od",
+      "quantityMax": "Do"
+    },
+    "columns": {
+      "itemNo": "Nr itemu",
+      "itemName": "Nazwa",
+      "materialNumber": "Numer materiału",
+      "unitId": "Numer jednostki",
+      "quantity": "Ilość",
+      "location": "Lokalizacja",
+      "note": "Notatka",
+      "cipStatus": "Zgodność z CIP"
+    },
+    "status": {
+      "match": "Zgodne",
+      "mismatch": "Rozbieżność"
+    },
+    "actions": {
+      "edit": "Edytuj",
+      "issue": "Wydaj"
+    },
+    "receivePanel": {
+      "title": "Dodaj przyjęcie",
+      "description": "Zarejestruj nową jednostkę materiału przyjętą do magazynu tymczasowego (MT).",
+      "itemNoLabel": "Numer itemu",
+      "itemNameLabel": "Nazwa materiału",
+      "quantityLabel": "Ilość",
+      "locationLabel": "Lokalizacja",
+      "unitIdLabel": "Numer jednostki",
+      "unitIdPlaceholder": "np. SZP-2234",
+      "note": "Docelowo: ilość i lokalizacja trafią do CIP przez jego API, a numer jednostki zostanie zapisany tylko tutaj, w Stock Manager.",
+      "save": "Zapisz",
+      "cancel": "Anuluj"
+    },
+    "editPanel": {
+      "title": "Edytuj",
+      "description": "Popraw dane materiału.",
+      "save": "Zapisz",
+      "cancel": "Anuluj"
+    },
+    "issuePanel": {
+      "title": "Wydaj jednostkę",
+      "description": "Wydanie pojedynczej jednostki z magazynu tymczasowego.",
+      "quantityLabel": "Ilość wydania",
+      "requiredQuantity": "Podaj poprawną ilość wydania.",
+      "maxQuantity": "Ilość nie może przekraczać dostępnej ilości ({max}).",
+      "confirm": "Wydaj",
+      "cancel": "Anuluj",
+      "note": "Wydanie usunie tę jednostkę z listy (w docelowej wersji: również z CIP).",
+      "noteAggregate": "Podana ilość zostanie odjęta od stanu (w docelowej wersji: również z CIP)."
+    },
+    "bulkIssuePanel": {
+      "trigger": "Wydaj zaznaczone ({count})",
+      "title": "Wydaj zaznaczone materiały",
+      "description": "Wybrano {count} pozycji. Materiały wydawane w całości mają już wpisaną pełną ilość - dla materiałów wydawanych częściowo podaj własną ilość.",
+      "confirm": "Wydaj ({count})"
+    },
+    "issueGroupPanel": {
+      "title": "Wydaj jednostki",
+      "description": "Wybierz, które jednostki tego materiału mają zostać wydane.",
+      "selectAll": "Zaznacz wszystkie",
+      "note": "Wydanie usunie zaznaczone jednostki z listy (w docelowej wersji: również z CIP).",
+      "confirm": "Wydaj ({count})"
+    },
+    "toast": {
+      "received": "Przyjęto {itemName} ({quantity}).",
+      "issued": "Wydano {itemName} ({quantity}).",
+      "issuedUnits": "Wydano {count} jednostek materiału {itemName}.",
+      "issuedBulk": "Wydano {count} pozycji."
+    },
+    "notePanel": {
+      "noteLabel": "Notatka",
+      "placeholder": "np. Dostawa opóźniona, sprawdzić przy następnym przyjęciu..."
+    }
+  },
+  "materialsHistorySm": {
+    "title": "Historia operacji SM",
+    "subtitle": "Tutaj pojawi się historia operacji śledzonych przez Stock Manager. Ta sekcja jest w przygotowaniu."
   },
   "materialsHistory": {
     "title": "Historia operacji",

@@ -38,15 +38,15 @@ export default function NavGroup({
         />
       </button>
       {open && (
-        <div className="mt-1 ml-4 space-y-1 border-l border-gray-200 dark:border-neutral-700 pl-3">
+        <div className="mt-1 ml-4 space-y-0.5 border-l border-gray-200 dark:border-neutral-700 pl-3">
           {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              className={`block rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 pathname === item.href
-                  ? "bg-navy-950 dark:bg-navy-500 text-white"
-                  : "text-gray-600 dark:text-neutral-400 hover:bg-navy-50 dark:hover:bg-neutral-800 hover:text-navy-950 dark:hover:text-white"
+                  ? "bg-navy-50 dark:bg-navy-500/15 text-navy-950 dark:text-white font-semibold"
+                  : "text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 hover:text-navy-950 dark:hover:text-white"
               }`}
             >
               {item.label}

@@ -109,6 +109,13 @@ export default function MaterialsTable({
   onRowClick,
   isLoading = false,
   loadError = null,
+  // Bleeds the table out to the page's own edges (matching the standard
+  // dashboard p-8 body) instead of sitting inset like the rest of the
+  // page content - the default for every normal page-level table. Pass
+  // false when the table lives inside its own padded/bordered container
+  // (e.g. MaterialBreakdownSection's card) - there, bleeding would blow
+  // past that container's own border instead of the page's.
+  bleed = true,
 }) {
   const tColumns = useTranslations("stock.columns");
   const tStock = useTranslations("stock");
@@ -377,12 +384,13 @@ export default function MaterialsTable({
 
   return (
     <div>
-      <Table containerClassName="max-h-[60vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-neutral-800">
+      <div className={bleed ? "-mx-8" : undefined}>
+      <Table containerClassName="max-h-[60vh] overflow-y-auto">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow
               key={headerGroup.id}
-              className="border-none bg-navy-950 dark:bg-navy-500 hover:bg-navy-950 dark:hover:bg-navy-500"
+              className="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800"
             >
               {headerGroup.headers.map((header) => {
                 const config = columnConfig.find((c) => c.key === header.column.id);
@@ -397,8 +405,10 @@ export default function MaterialsTable({
                   <TableHead
                     key={header.id}
                     style={resizedWidth ? { width: resizedWidth, minWidth: resizedWidth, maxWidth: resizedWidth } : undefined}
-                    className={`sticky top-0 h-11 bg-navy-950 px-4 text-sm font-semibold text-white dark:bg-navy-500 ${
-                      isActionsCol ? "right-0 z-20 border-l border-navy-900 dark:border-navy-600" : "relative z-10"
+                    className={`sticky top-0 h-11 bg-gray-50 px-4 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:bg-neutral-800 dark:text-neutral-400 ${
+                      bleed ? "first:pl-8 last:pr-8" : ""
+                    } ${
+                      isActionsCol ? "right-0 z-20 border-l border-gray-200 dark:border-neutral-700" : "z-10"
                     } ${config?.className ?? ""}`}
                   >
                     <ContextMenu>
@@ -435,8 +445,8 @@ export default function MaterialsTable({
                             title={simplifiedColumns[config.key] ? tActions("showFull") : tActions("showSimplified")}
                             className={`shrink-0 rounded-md p-1 transition-colors ${
                               simplifiedColumns[config.key]
-                                ? "bg-white/20 text-white"
-                                : "text-white/60 hover:bg-white/10 hover:text-white"
+                                ? "bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-white"
+                                : "text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white"
                             }`}
                           >
                             {simplifiedColumns[config.key] ? (
@@ -469,7 +479,9 @@ export default function MaterialsTable({
                         }
                         title={tActions("resetColumnWidth")}
                         className={`absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none ${
-                          header.column.getIsResizing() ? "bg-white/40" : "hover:bg-white/20"
+                          header.column.getIsResizing()
+                            ? "bg-navy-400/50 dark:bg-navy-400/40"
+                            : "hover:bg-gray-300/60 dark:hover:bg-neutral-600/50"
                         }`}
                       />
                     )}
@@ -490,24 +502,30 @@ export default function MaterialsTable({
               </TableCell>
             </TableRow>
           ) : (
-            visibleRows.map((row, index) => {
-              const stripeCls = rowClassName?.(row.original) || (index % 2 === 1 ? "bg-gray-50/60 dark:bg-neutral-900/40" : "bg-white dark:bg-neutral-900");
+            visibleRows.map((row) => {
+              // Plain flat rows, no zebra alternation - a caller-supplied
+              // rowClassName (semantic status tints in BalanceTable, a
+              // selected-row highlight in MaterialBreakdownSection) still
+              // wins when given; otherwise rows fall back to the same
+              // quiet hover/selected styling every table in the app uses
+              // (Table/TableRow's own defaults - see components/ui/table.jsx).
+              const stripeCls = rowClassName?.(row.original) || "";
               const isSelected = row.getIsSelected();
-              // The sticky actions cell can't reuse stripeCls as-is: its
-              // "/60"/"/40" alpha means the row content that has scrolled
-              // out from underneath the (fixed-position) cell would still
-              // show through, since a sticky element isn't actually
-              // clipped by the rest of the row - it needs a fully opaque
-              // background of its own. Kept a single flat color across
-              // every row (not alternating with the stripe) so the frozen
-              // column reads as one consistent strip, not columns.
-              const stickyBgCls = isSelected ? "!bg-navy-100 dark:!bg-navy-900" : "bg-white dark:bg-neutral-900";
+              // The sticky actions cell can't reuse stripeCls/the row's
+              // hover-bg as-is: any alpha in those means row content that
+              // scrolled out from underneath the (fixed-position) cell
+              // would still show through, since a sticky element isn't
+              // actually clipped by the rest of the row - it needs a fully
+              // opaque background of its own, flat across every row (not
+              // alternating) so the frozen column reads as one consistent
+              // strip, not columns.
+              const stickyBgCls = isSelected ? "!bg-gray-100 dark:!bg-neutral-800" : "bg-white dark:bg-neutral-900";
               return (
               <TableRow
                 key={row.id}
                 data-state={isSelected ? "selected" : undefined}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                className={`group border-gray-100 dark:border-neutral-800 ${onRowClick ? "cursor-pointer" : ""} ${stripeCls} data-[state=selected]:bg-navy-50 dark:data-[state=selected]:bg-navy-950/40 hover:bg-navy-50/60 dark:hover:bg-neutral-800/60`}
+                className={`group border-gray-100 dark:border-neutral-800 ${onRowClick ? "cursor-pointer" : ""} ${stripeCls}`}
               >
                 {row.getVisibleCells().map((cell) => {
                   const config = columnConfig.find((c) => c.key === cell.column.id);
@@ -517,9 +535,9 @@ export default function MaterialsTable({
                     <TableCell
                       key={cell.id}
                       style={resizedWidth ? { width: resizedWidth, minWidth: resizedWidth, maxWidth: resizedWidth } : undefined}
-                      className={`px-4 py-2.5 text-gray-700 dark:text-neutral-300 ${
+                      className={`px-4 py-2.5 text-gray-700 dark:text-neutral-300 ${bleed ? "first:pl-8 last:pr-8" : ""} ${
                         isActionsCol
-                          ? `sticky right-0 z-10 border-l border-gray-100 dark:border-neutral-800 ${stickyBgCls} group-hover:!bg-navy-100 dark:group-hover:!bg-neutral-700`
+                          ? `sticky right-0 z-10 border-l border-gray-100 dark:border-neutral-800 ${stickyBgCls} group-hover:!bg-gray-100 dark:group-hover:!bg-neutral-700`
                           : resizedWidth
                           ? "overflow-hidden text-ellipsis whitespace-nowrap"
                           : ""
@@ -535,6 +553,7 @@ export default function MaterialsTable({
           )}
         </TableBody>
       </Table>
+      </div>
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <span className="text-gray-500 dark:text-neutral-400">
