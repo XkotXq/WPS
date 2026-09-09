@@ -25,6 +25,28 @@ system for FRP / coated-FRP / filler materials:
   design. Now a dynamic app (not a static export) with its own
   additional unprotected route (`/frp-list`).
 
+Nav's "Materiały" area is split into two sections now: "Materiały CIP"
+(`materials-list-cip` - the real CIP-backed list, see next paragraph) and
+"Materiały SM" (`materials-list-sm` - the unit-tracking concept, see
+"Materiały SM (Stock Manager)" below). Don't confuse the two when editing
+either - they look similar but one is real data, the other is a local-only
+demo.
+
+## Working rules for whoever edits this repo (agent or human)
+- **Libraries**: reach for an existing, well-established library when it
+  genuinely simplifies the work - this repo already depends on
+  `@tanstack/react-table`, `@dnd-kit/*`, `date-fns`, `recharts`, etc.
+  precisely so nobody has to hand-roll what they solve. Check
+  `package.json` for what's already available before writing something
+  from scratch.
+- **Adding a new dependency**: never `npm install` a new package as a side
+  effect of a task - propose it to the user and wait for a yes first, even
+  when it would clearly be the "normal" choice. Example: `components/ui/dialog.jsx`
+  and `components/ui/toast.jsx` are small local primitives built on the
+  `@base-ui/react` dependency this repo already has, instead of pulling in
+  something like `sonner` (a fine library - `../stock` already uses it for
+  its own toasts - just not one to add here unasked).
+
 Auth: both `wps` and `stock` log in against the company's legacy CIP
 system (OAuth2 password grant) proxied server-side through
 `POST /api/auth/login` (the API talks to CIP directly so the browser
@@ -92,6 +114,48 @@ two entries with the same key and React throws "two children with the
 same key" when rendering the "wg itemu" breakdown table's compare
 columns. The trend query itself is capped server-side at 150 rounds (see
 wpsApi's `getMaterialTrend`).
+
+## "Materiały SM" (Stock Manager) - the unit-tracking concept
+`app/dashboard/materials-list-sm/` (component: `components/SmMaterialsPanel.js`)
+is a from-scratch concept page, separate from the real CIP-backed
+"Materiały CIP" section (`materials-list-cip/`, `CipMaterialsTable.js`).
+The problem it explores: CIP only ever stores an item's aggregate
+quantity + location (e.g. "item 404, 48.800, MT") - it has no field for
+*which physical unit* that quantity is on, so a spool's own drum number
+or a single bigbag's individual weight has nowhere to live in CIP. This
+page demos layering that missing per-unit detail on top, entirely
+locally (its `INITIAL_ITEMS` mock state lives only in the component,
+sourced for realism from `stock`'s own `DEFAULT_FRP_DB` catalog):
+
+- **Data model**: each item is either `trackedIndividually: true` (has a
+  `units` array - one entry per spool/bigbag, each with its own `id`,
+  `unitType` ("spool"/"bigbag"), `unitId` e.g. "SZP-2231", `quantity`,
+  `note`) or `trackedIndividually: false` (a single combined
+  `totalQuantity` - e.g. thread sold by weight, a CIP-style aggregate
+  with nothing to split into units).
+- **Row "kind" discriminator**: edit/issue panels take a row shaped
+  `{ kind: "unit" | "item" | "aggregate", ... }` and branch on it (see
+  `EditUnitPanel`, `IssueUnitPanel`) instead of needing three separate
+  panel components.
+- **Issuing**: a unit (spool/bigbag) is always issued in full - there's
+  no partial concept for a single physical object. An aggregate material
+  *can* be issued partially (a quantity input caps at what's left;
+  issuing less than the total just shrinks it instead of removing the
+  row) - see `issueRow()`, the pure reducer shared by every issue path.
+  Three entry points all funnel through it: `IssueUnitPanel` (one row),
+  `IssueGroupPanel` (a whole item's checklist of units, opened from the
+  group row's own "Wydaj"), and `BulkIssuePanel` (cross-item - any mix of
+  checkboxes across the table, opened from the toolbar's "Wydaj
+  zaznaczone", rendered as a table so every value gets its own column).
+- **Nothing here persists anywhere real yet** - see the "note" copy in
+  each panel. The two-write idea the concept is built around: a real
+  implementation would push item/quantity/location to CIP through its
+  own write API and keep the unit id locally, since CIP has no field for
+  it.
+- Every create/issue action on this page ends with a bottom-right toast
+  (`components/ui/toast.jsx`'s `useToastStack`/`ToastStack`) confirming
+  what happened - keep that call site pattern (`pushToast(t("toast.xxx", {...}))`
+  right after the state update) if this page grows more actions.
 
 Known gotchas worth knowing before editing:
 - Next.js Server Components **cannot** pass functions as props to Client
