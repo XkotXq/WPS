@@ -275,7 +275,7 @@
   },
   "materialsListSm": {
     "title": "SM Materials List",
-    "addReceipt": "Add receipt",
+    "addReceipt": "Receipt",
     "viewMode": {
       "grouped": "Grouped",
       "flat": "List"
@@ -283,10 +283,13 @@
     "tableFilters": {
       "apply": "Apply",
       "clear": "Clear",
-      "namePlaceholder": "Search by name...",
       "notePlaceholder": "Search by note...",
       "quantityMin": "Min",
-      "quantityMax": "Max"
+      "quantityMax": "Max",
+      "searchOptions": "Search...",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "noOptions": "No results"
     },
     "columns": {
       "itemNo": "Item no.",
@@ -308,45 +311,35 @@
     },
     "receivePanel": {
       "title": "Add receipt",
-      "description": "Register a new material unit received into the temporary-storage warehouse (MT).",
       "itemNoLabel": "Item number",
       "itemNameLabel": "Material name",
       "quantityLabel": "Quantity",
       "locationLabel": "Location",
       "unitIdLabel": "Unit number",
-      "unitIdPlaceholder": "e.g. SZP-2234",
-      "note": "Eventually: quantity and location will be sent to CIP via its API, while the unit number will only be stored here, in Stock Manager.",
       "save": "Save",
       "cancel": "Cancel"
     },
     "editPanel": {
       "title": "Edit",
-      "description": "Correct the material's data.",
       "save": "Save",
       "cancel": "Cancel"
     },
     "issuePanel": {
       "title": "Issue unit",
-      "description": "Issue a single unit from the temporary-storage warehouse.",
       "quantityLabel": "Quantity to issue",
       "requiredQuantity": "Enter a valid quantity to issue.",
       "maxQuantity": "Quantity can't exceed the available amount ({max}).",
       "confirm": "Issue",
-      "cancel": "Cancel",
-      "note": "Issuing removes this unit from the list (in the final version: from CIP too).",
-      "noteAggregate": "The entered quantity will be deducted from stock (in the final version: from CIP too)."
+      "cancel": "Cancel"
     },
     "bulkIssuePanel": {
       "trigger": "Issue selected ({count})",
       "title": "Issue selected materials",
-      "description": "{count} items selected. Materials issued in full already show their full quantity - for materials issued partially, enter your own amount.",
       "confirm": "Issue ({count})"
     },
     "issueGroupPanel": {
       "title": "Issue units",
-      "description": "Choose which units of this material should be issued.",
       "selectAll": "Select all",
-      "note": "Issuing removes the selected units from the list (in the final version: from CIP too).",
       "confirm": "Issue ({count})"
     },
     "toast": {

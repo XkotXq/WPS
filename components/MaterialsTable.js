@@ -539,7 +539,7 @@ export default function MaterialsTable({
                         isActionsCol
                           ? `sticky right-0 z-10 border-l border-gray-100 dark:border-neutral-800 ${stickyBgCls} group-hover:!bg-gray-100 dark:group-hover:!bg-neutral-700`
                           : resizedWidth
-                          ? "overflow-hidden text-ellipsis whitespace-nowrap"
+                          ? "whitespace-normal break-words"
                           : ""
                       } ${config?.className ?? ""}`}
                     >

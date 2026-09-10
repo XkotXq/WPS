@@ -8,11 +8,15 @@ import FrpFilters from "@/components/FrpFilters";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
+// Filter types mirror the same-shaped columns on "Lista stocków"
+// (lib/materials-data.js's frpColumns etc.): a bounded catalog field like
+// the item number gets a multiselect (pick from what's actually loaded),
+// while a free-form field like location gets a plain text filter.
 const COLUMNS = [
-  { key: "itemNo", headerKey: "materialsItemNo", filterFn: "includesString", sortable: true },
-  { key: "itemName", headerKey: "materialsItemName", filterFn: "includesString", sortable: true, className: "max-w-[220px] truncate" },
+  { key: "itemNo", headerKey: "materialsItemNo", filterFn: "multiselect", sortable: true },
+  { key: "itemName", headerKey: "materialsItemName", filterFn: "multiselect", sortable: true, className: "max-w-[220px] truncate" },
   { key: "specifications", headerKey: "materialsSpec", filterFn: "inNumberRange", sortable: true },
-  { key: "locationCode", headerKey: "materialsLocation", filterFn: "multiselect", sortable: true },
+  { key: "locationCode", headerKey: "materialsLocation", filterFn: "includesString", sortable: true },
   { key: "note", headerKey: "note", filterFn: "includesString" },
   { key: "createTime", headerKey: "materialsCreateTime", filterFn: "includesString", sortable: true },
 ];

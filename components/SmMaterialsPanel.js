@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
-import { Plus, Pencil, PackageMinus, Search, Disc3, Package, Download, ChevronDown, ChevronRight, Layers, List, Filter } from "lucide-react";
+import { Plus, Pencil, PackageMinus, Search, Download, ChevronDown, ChevronRight, Layers, List, Filter } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -36,7 +36,13 @@ const INITIAL_ITEMS = [
     locationCode: "ST 01",
     note: "-",
     trackedIndividually: true,
-    units: [{ id: "u2", unitType: "spool", unitId: "SZP-2232", quantity: "51.200", note: "-", cipStatus: "match" }],
+    units: [
+      { id: "u2", unitType: "spool", unitId: "SZP-2232", quantity: "51.200", note: "-", cipStatus: "match" },
+      { id: "u18", unitType: "spool", unitId: "Y402", quantity: "48.800", note: "-", cipStatus: "match" },
+      { id: "u19", unitType: "spool", unitId: "Y404", quantity: "48.800", note: "-", cipStatus: "match" },
+      { id: "u20", unitType: "spool", unitId: "Y444", quantity: "48.800", note: "-", cipStatus: "match" },
+      { id: "u21", unitType: "spool", unitId: "Y450", quantity: "48.800", note: "-", cipStatus: "match" },
+    ],
   },
   {
     itemNo: "993916000000239",
@@ -180,24 +186,10 @@ function sanitizeQuantityInput(value) {
 }
 
 const FIELD_CLS =
-  "h-10 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 focus:border-navy-700 dark:focus:border-navy-400 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400 disabled:opacity-60 disabled:cursor-not-allowed";
+  "h-10 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 focus:border-navy-700 dark:focus:border-navy-400 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400 disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-gray-100 disabled:text-gray-400 dark:disabled:border-neutral-800 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-600";
 const LABEL_CLS = "text-xs font-medium text-gray-500 dark:text-neutral-400";
 const ROW_ACTION_CLS =
   "rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200";
-const UNIT_TYPE_ICON_CLS = {
-  spool: "bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
-  bigbag: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
-};
-
-function UnitTypeIcon({ unitType }) {
-  const Icon = unitType === "spool" ? Disc3 : Package;
-  return (
-    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${UNIT_TYPE_ICON_CLS[unitType]}`}>
-      <Icon className="h-4 w-4" />
-    </span>
-  );
-}
-
 // Read-only recap of the row an edit/issue panel is acting on.
 function UnitInfo({ row, t }) {
   return (
@@ -228,10 +220,11 @@ function UnitInfo({ row, t }) {
 // on a real save this would (1) push item/quantity/location to CIP through
 // its API and (2) keep the unit number here, since CIP has nowhere to put
 // it. For now it only updates local state, to demo the flow.
-function ReceiveUnitPanel({ open, onOpenChange, onCreate, t }) {
+function ReceiveUnitPanel({ open, onOpenChange, onCreate, items, t }) {
   const [itemNo, setItemNo] = useState("");
   const [itemName, setItemName] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [location, setLocation] = useState("");
   const [unitId, setUnitId] = useState("");
 
   useEffect(() => {
@@ -239,6 +232,7 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, t }) {
     setItemNo("");
     setItemName("");
     setQuantity("");
+    setLocation("");
     setUnitId("");
   }, [open]);
 
@@ -252,8 +246,21 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, t }) {
       itemName: itemName.trim(),
       unitId: unitId.trim(),
       quantity: quantity.trim(),
+      locationCode: location.trim() || "MT",
     });
     onOpenChange(false);
+  }
+
+  // Auto-fills the name once the user leaves the item-number field, looked
+  // up against the materials already known to this page - there's no real
+  // backend endpoint for this yet (see AGENTS.md), so this stands in for
+  // one until it exists; swapping in a real fetch later only touches this
+  // function.
+  function handleItemNoBlur() {
+    const trimmed = itemNo.trim();
+    if (!trimmed) return;
+    const match = items.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
+    if (match) setItemName(match.itemName);
   }
 
   return (
@@ -261,13 +268,12 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, t }) {
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{t("receivePanel.title")}</SheetTitle>
-          <SheetDescription>{t("receivePanel.description")}</SheetDescription>
         </SheetHeader>
 
         <form id="receive-unit-form" onSubmit={handleSubmit} className="flex flex-1 flex-col gap-3 overflow-y-auto">
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLS}>{t("receivePanel.itemNoLabel")}</span>
-            <input className={FIELD_CLS} value={itemNo} onChange={(e) => setItemNo(e.target.value)} />
+            <input className={FIELD_CLS} value={itemNo} onChange={(e) => setItemNo(e.target.value)} onBlur={handleItemNoBlur} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLS}>{t("receivePanel.itemNameLabel")}</span>
@@ -278,26 +284,22 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, t }) {
             <input
               className={FIELD_CLS}
               inputMode="decimal"
-              placeholder="np. 48.800"
               value={quantity}
               onChange={(e) => setQuantity(sanitizeQuantityInput(e.target.value))}
             />
           </label>
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLS}>{t("receivePanel.locationLabel")}</span>
-            <input className={FIELD_CLS} value="MT" disabled />
+            <input className={FIELD_CLS} placeholder="MT" value={location} onChange={(e) => setLocation(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLS}>{t("receivePanel.unitIdLabel")}</span>
             <input
               className={FIELD_CLS}
-              placeholder={t("receivePanel.unitIdPlaceholder")}
               value={unitId}
               onChange={(e) => setUnitId(e.target.value)}
             />
           </label>
-
-          <p className="text-xs text-gray-400 dark:text-neutral-500">{t("receivePanel.note")}</p>
         </form>
 
         <SheetFooter>
@@ -345,7 +347,6 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, t }) {
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{t("editPanel.title")}</SheetTitle>
-          <SheetDescription>{t("editPanel.description")}</SheetDescription>
         </SheetHeader>
 
         <form id="edit-unit-form" onSubmit={handleSubmit} className="flex flex-1 flex-col gap-3 overflow-y-auto">
@@ -439,11 +440,17 @@ function IssueUnitPanel({ row, open, onOpenChange, onIssue, t }) {
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{t("issuePanel.title")}</SheetTitle>
-          <SheetDescription>{t("issuePanel.description")}</SheetDescription>
         </SheetHeader>
 
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
-          <UnitInfo row={row} t={t} />
+        <div className="flex flex-1 flex-col justify-center gap-5 overflow-y-auto">
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-6 py-8 text-center dark:border-neutral-800 dark:bg-neutral-800/50">
+            <div>
+              <p className="text-base font-semibold text-gray-900 dark:text-neutral-100">{row.unitId ?? row.itemName}</p>
+              <p className="text-xs text-gray-400 dark:text-neutral-500">{row.unitId ? row.itemName : row.itemNo}</p>
+            </div>
+            {!isAggregate && <p className="text-2xl font-semibold tabular-nums text-gray-900 dark:text-neutral-100">{row.quantity}</p>}
+          </div>
+
           {isAggregate && (
             <label className="flex flex-col gap-1">
               <span className={LABEL_CLS}>{t("issuePanel.quantityLabel")}</span>
@@ -459,9 +466,6 @@ function IssueUnitPanel({ row, open, onOpenChange, onIssue, t }) {
               {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
             </label>
           )}
-          <p className="text-xs text-gray-400 dark:text-neutral-500">
-            {t(isAggregate ? "issuePanel.noteAggregate" : "issuePanel.note")}
-          </p>
         </div>
 
         <SheetFooter>
@@ -510,7 +514,6 @@ function IssueGroupPanel({ item, open, onOpenChange, onIssue, t }) {
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{t("issueGroupPanel.title")}</SheetTitle>
-          <SheetDescription>{t("issueGroupPanel.description")}</SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
@@ -535,14 +538,11 @@ function IssueGroupPanel({ item, open, onOpenChange, onIssue, t }) {
                 className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
               >
                 <Checkbox checked={selected.has(u.id)} onCheckedChange={() => toggleUnit(u.id)} />
-                <UnitTypeIcon unitType={u.unitType} />
                 <span className="font-medium">{u.unitId}</span>
                 <span className="text-gray-400 dark:text-neutral-500">{u.quantity}</span>
               </label>
             ))}
           </div>
-
-          <p className="text-xs text-gray-400 dark:text-neutral-500">{t("issueGroupPanel.note")}</p>
         </div>
 
         <SheetFooter>
@@ -579,9 +579,14 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
 
   useEffect(() => {
     if (!open) return;
-    setQuantities({});
+    // Unit rows (a single spool/bigbag) are prefilled with their full
+    // quantity so the input still shows what will be issued if left
+    // untouched; aggregate rows (a combined quantity that can be issued
+    // partially) start empty so the user types how much to issue - leaving
+    // it empty still issues the full available amount (see handleConfirm).
+    setQuantities(Object.fromEntries(rows.filter((row) => row.kind !== "aggregate").map((row) => [row.id, String(row.quantity)])));
     setErrors({});
-  }, [open]);
+  }, [open, rows]);
 
   function setQuantity(id, value) {
     setQuantities((prev) => ({ ...prev, [id]: sanitizeQuantityInput(value) }));
@@ -591,7 +596,6 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
   function handleConfirm() {
     const nextErrors = {};
     rows.forEach((row) => {
-      if (row.kind !== "aggregate") return;
       const raw = (quantities[row.id] ?? "").trim();
       if (!raw) return;
       const value = parseFloat(raw.replace(",", "."));
@@ -603,16 +607,15 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
       setErrors(nextErrors);
       return;
     }
-    onIssue(rows.map((row) => ({ row, quantity: row.kind === "aggregate" ? quantities[row.id]?.trim() || undefined : undefined })));
+    onIssue(rows.map((row) => ({ row, quantity: quantities[row.id]?.trim() || undefined })));
     onOpenChange(false);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-[67.2rem]">
         <DialogHeader>
           <DialogTitle>{t("bulkIssuePanel.title")}</DialogTitle>
-          <DialogDescription>{t("bulkIssuePanel.description", { count: rows.length })}</DialogDescription>
         </DialogHeader>
 
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-neutral-800">
@@ -642,15 +645,17 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
                     {row.unitId ?? <span className="text-gray-400 dark:text-neutral-500">-</span>}
                   </TableCell>
                   <TableCell className="pr-4">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      disabled={row.kind !== "aggregate"}
-                      placeholder={row.quantity}
-                      value={row.kind === "aggregate" ? quantities[row.id] ?? "" : row.quantity}
-                      onChange={(e) => setQuantity(row.id, e.target.value)}
-                      className={`${FIELD_CLS} h-9 w-28 text-right`}
-                    />
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span className="tabular-nums text-sm text-gray-700 dark:text-neutral-200">{row.quantity}</span>
+                      <span className="text-gray-300 dark:text-neutral-600">/</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={quantities[row.id] ?? ""}
+                        onChange={(e) => setQuantity(row.id, e.target.value)}
+                        className={`${FIELD_CLS.replace("w-full", "w-20").replace("px-3", "px-1")} h-9 text-right`}
+                      />
+                    </div>
                     {errors[row.id] && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors[row.id]}</p>}
                   </TableCell>
                 </TableRow>
@@ -679,7 +684,14 @@ export default function SmMaterialsPanel() {
   const [items, setItems] = useState(INITIAL_ITEMS);
   const [search, setSearch] = useState("");
   // Table filters: narrow the already-loaded items.
-  const [columnFilters, setColumnFilters] = useState({ itemName: "", note: "", quantityMin: "", quantityMax: "" });
+  const [columnFilters, setColumnFilters] = useState({ note: "", quantityMin: "", quantityMax: "" });
+  // itemName is a bounded catalog field (same materials list, same shape as
+  // "Nr itemu" on the CIP-backed table) so it gets a multiselect instead of
+  // a plain substring filter - see CipMaterialsTable.js's COLUMNS comment.
+  // undefined means "no filter, everything visible"; otherwise the set of
+  // currently visible names.
+  const [nameFilter, setNameFilter] = useState(undefined);
+  const [nameFilterSearch, setNameFilterSearch] = useState("");
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
   const [issuingRow, setIssuingRow] = useState(null);
@@ -775,9 +787,13 @@ export default function SmMaterialsPanel() {
     });
   }
 
+  const itemNameOptions = useMemo(
+    () => [...new Set(items.map((it) => it.itemName))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [items]
+  );
+
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const nameQuery = columnFilters.itemName.trim().toLowerCase();
     const noteQuery = columnFilters.note.trim().toLowerCase();
     const min = parseFloat(columnFilters.quantityMin);
     const max = parseFloat(columnFilters.quantityMax);
@@ -790,14 +806,14 @@ export default function SmMaterialsPanel() {
           (it.units ?? []).some((u) => u.unitId.toLowerCase().includes(q));
         if (!matchesSearch) return false;
       }
-      if (nameQuery && !it.itemName.toLowerCase().includes(nameQuery)) return false;
+      if (nameFilter && !nameFilter.includes(it.itemName)) return false;
       if (noteQuery && !(it.note ?? "").toLowerCase().includes(noteQuery)) return false;
       const qty = itemQuantityValue(it);
       if (!Number.isNaN(min) && qty < min) return false;
       if (!Number.isNaN(max) && qty > max) return false;
       return true;
     });
-  }, [items, search, columnFilters]);
+  }, [items, search, columnFilters, nameFilter]);
 
   const hasColumnFilter = (key) => columnFilters[key].trim() !== "";
   const hasQuantityFilter = columnFilters.quantityMin.trim() !== "" || columnFilters.quantityMax.trim() !== "";
@@ -811,6 +827,19 @@ export default function SmMaterialsPanel() {
       const next = { ...prev };
       keys.forEach((key) => (next[key] = ""));
       return next;
+    });
+  }
+
+  const nameFilterSelected = nameFilter ?? itemNameOptions;
+  const visibleNameOptions = nameFilterSearch.trim()
+    ? itemNameOptions.filter((name) => name.toLowerCase().includes(nameFilterSearch.trim().toLowerCase()))
+    : itemNameOptions;
+
+  function toggleNameFilterValue(value) {
+    setNameFilter((prev) => {
+      const current = prev ?? itemNameOptions;
+      const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+      return next.length === itemNameOptions.length ? undefined : next;
     });
   }
 
@@ -856,7 +885,7 @@ export default function SmMaterialsPanel() {
       const newUnit = { id: unit.id, unitType: unit.unitType, unitId: unit.unitId, quantity: unit.quantity, note: "-", cipStatus: "match" };
       if (idx === -1) {
         return [
-          { itemNo: unit.itemNo, itemName: unit.itemName, locationCode: "MT", note: "-", trackedIndividually: true, units: [newUnit] },
+          { itemNo: unit.itemNo, itemName: unit.itemName, locationCode: unit.locationCode, note: "-", trackedIndividually: true, units: [newUnit] },
           ...prev,
         ];
       }
@@ -889,8 +918,10 @@ export default function SmMaterialsPanel() {
 
   // Pure reducer step shared by every issue path (single row, group
   // checklist, cross-item bulk): issuing everything that's left behaves
-  // like before (the item/unit disappears); issuing less than an
-  // aggregate's total just shrinks its remaining amount instead.
+  // like before (the item/unit disappears); issuing less than what's
+  // available just shrinks the remaining amount instead - for an
+  // aggregate's total, and (bulk-issue only, where the quantity input is
+  // editable for units too) for a single unit's own length/weight.
   function issueRow(itemsArr, row, quantity) {
     if (row.kind === "aggregate") {
       return itemsArr.flatMap((it) => {
@@ -904,7 +935,21 @@ export default function SmMaterialsPanel() {
       });
     }
     return itemsArr
-      .map((it) => (it.itemNo === row.itemNo ? { ...it, units: it.units.filter((u) => u.id !== row.id) } : it))
+      .map((it) => {
+        if (it.itemNo !== row.itemNo) return it;
+        return {
+          ...it,
+          units: it.units.flatMap((u) => {
+            if (u.id !== row.id) return [u];
+            const available = parseFloat(u.quantity);
+            const issued = quantity !== undefined ? parseFloat(quantity) : available;
+            if (issued >= available) return [];
+            const remaining = available - issued;
+            const formatted = remaining % 1 === 0 ? String(remaining) : remaining.toFixed(3);
+            return [{ ...u, quantity: formatted }];
+          }),
+        };
+      })
       .filter((it) => (it.trackedIndividually ? it.units.length > 0 : true));
   }
 
@@ -960,7 +1005,7 @@ export default function SmMaterialsPanel() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("columns.itemNo") + " / " + t("columns.itemName") + " / " + t("columns.unitId")}
-            className="h-9 w-full rounded-lg border-none bg-gray-100 dark:bg-neutral-800 pl-9 pr-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
+            className="h-9 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 pl-9 pr-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
           />
         </div>
         <div className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 p-1">
@@ -1004,7 +1049,7 @@ export default function SmMaterialsPanel() {
             <Download className="h-4 w-4" />
             {exporting ? tActions("exporting") : tActions("exportExcel")}
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setReceiveOpen(true)}>
+          <Button size="sm" className="gap-1.5 px-3.5 font-semibold" onClick={() => setReceiveOpen(true)}>
             <Plus className="h-4 w-4" />
             {t("addReceipt")}
           </Button>
@@ -1012,7 +1057,7 @@ export default function SmMaterialsPanel() {
       </div>
 
       <div className="mt-4 -mx-8">
-        <Table containerClassName="max-h-[60vh] overflow-y-auto">
+        <Table containerClassName="min-h-[500px] max-h-[60vh] overflow-y-auto">
           <TableHeader>
             <TableRow className="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800">
               <TableHead className="sticky top-0 z-10 w-10 bg-gray-50 pl-8 dark:bg-neutral-800">
@@ -1033,30 +1078,61 @@ export default function SmMaterialsPanel() {
                 style={headStyle("itemName")}
                 className="sticky top-0 z-10 bg-gray-50 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:bg-neutral-800 dark:text-neutral-500"
               >
-                <Popover>
+                <Popover onOpenChange={(open) => open && setNameFilterSearch("")}>
                   <PopoverTrigger
                     render={
                       <button type="button" className="flex items-center gap-1">
                         <span>{t("columns.itemName")}</span>
                         <Filter
                           className={`h-3 w-3 shrink-0 ${
-                            hasColumnFilter("itemName") ? "text-navy-600 dark:text-navy-300" : "text-gray-400 dark:text-neutral-500"
+                            nameFilter ? "text-navy-600 dark:text-navy-300" : "text-gray-400 dark:text-neutral-500"
                           }`}
                         />
                       </button>
                     }
                   />
-                  <PopoverContent align="start" className="w-56">
+                  <PopoverContent align="start" className="w-72">
                     <input
                       type="text"
                       autoFocus
-                      value={columnFilters.itemName}
-                      onChange={(e) => setColumnFilter("itemName", e.target.value)}
-                      placeholder={t("tableFilters.namePlaceholder")}
+                      value={nameFilterSearch}
+                      onChange={(e) => setNameFilterSearch(e.target.value)}
+                      placeholder={t("tableFilters.searchOptions")}
                       className={FIELD_CLS}
                     />
-                    {hasColumnFilter("itemName") && (
-                      <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => clearColumnFilter("itemName")}>
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setNameFilter(undefined)}
+                        className="font-medium text-navy-700 hover:underline dark:text-navy-300"
+                      >
+                        {t("tableFilters.selectAll")}
+                      </button>
+                      <span className="text-gray-300 dark:text-neutral-600">·</span>
+                      <button
+                        type="button"
+                        onClick={() => setNameFilter([])}
+                        className="font-medium text-navy-700 hover:underline dark:text-navy-300"
+                      >
+                        {t("tableFilters.selectNone")}
+                      </button>
+                    </div>
+                    <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                      {visibleNameOptions.map((value) => (
+                        <label
+                          key={value}
+                          className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 text-sm text-gray-700 hover:bg-gray-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                        >
+                          <Checkbox checked={nameFilterSelected.includes(value)} onCheckedChange={() => toggleNameFilterValue(value)} className="mt-0.5" />
+                          <span className="break-words">{value}</span>
+                        </label>
+                      ))}
+                      {visibleNameOptions.length === 0 && (
+                        <p className="px-1 py-1 text-sm text-gray-400 dark:text-neutral-500">{t("tableFilters.noOptions")}</p>
+                      )}
+                    </div>
+                    {nameFilter && (
+                      <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => setNameFilter(undefined)}>
                         {t("tableFilters.clear")}
                       </Button>
                     )}
@@ -1208,12 +1284,7 @@ export default function SmMaterialsPanel() {
                       <TableCell className="pl-8">
                         <Checkbox checked={selectedIds.has(u.id)} onCheckedChange={(value) => setRowSelected(u.id, Boolean(value))} />
                       </TableCell>
-                      <TableCell className="text-gray-600 dark:text-neutral-300">
-                        <div className="flex items-center gap-2">
-                          <UnitTypeIcon unitType={u.unitType} />
-                          {item.itemNo}
-                        </div>
-                      </TableCell>
+                      <TableCell className="text-gray-600 dark:text-neutral-300">{item.itemNo}</TableCell>
                       <TableCell className="text-gray-600 dark:text-neutral-300">{item.itemName}</TableCell>
                       <TableCell className="text-gray-600 dark:text-neutral-300">{u.unitId}</TableCell>
                       <TableCell className="text-gray-600 dark:text-neutral-300">{u.quantity}</TableCell>
@@ -1286,13 +1357,8 @@ export default function SmMaterialsPanel() {
                       <TableCell className="pl-8">
                         <Checkbox checked={selectedIds.has(u.id)} onCheckedChange={(value) => setRowSelected(u.id, Boolean(value))} />
                       </TableCell>
-                      <TableCell className="pl-6">
-                        <span className="inline-flex items-center gap-2 text-gray-700 dark:text-neutral-200">
-                          <UnitTypeIcon unitType={u.unitType} />
-                          {u.unitId}
-                        </span>
-                      </TableCell>
-                      <TableCell />
+                      <TableCell className="pl-6 text-gray-700 dark:text-neutral-200">{u.unitId}</TableCell>
+                      <TableCell className="text-gray-600 dark:text-neutral-300">{item.itemName}</TableCell>
                       <TableCell className="text-gray-600 dark:text-neutral-300">{u.quantity}</TableCell>
                       <TableCell className="text-gray-600 dark:text-neutral-300">{item.locationCode}</TableCell>
                       <TableCell className="text-gray-400 dark:text-neutral-500">{u.note}</TableCell>
@@ -1321,7 +1387,7 @@ export default function SmMaterialsPanel() {
         </p>
       )}
 
-      <ReceiveUnitPanel open={receiveOpen} onOpenChange={setReceiveOpen} onCreate={handleCreate} t={t} />
+      <ReceiveUnitPanel open={receiveOpen} onOpenChange={setReceiveOpen} onCreate={handleCreate} items={items} t={t} />
       <EditUnitPanel row={editingRow} open={Boolean(editingRow)} onOpenChange={(open) => !open && setEditingRow(null)} onSave={handleSave} t={t} />
       <IssueUnitPanel row={issuingRow} open={Boolean(issuingRow)} onOpenChange={(open) => !open && setIssuingRow(null)} onIssue={handleIssue} t={t} />
       <IssueGroupPanel

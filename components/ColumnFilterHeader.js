@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDownZA, ArrowUpAZ, EyeOff, Filter, X } from "lucide-react";
+import { ArrowDownZA, ArrowUpAZ, Filter, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -230,20 +230,6 @@ export default function ColumnFilterHeader({ column, label, variant = "text", so
             </Button>
           </div>
         </div>
-
-        {column.getCanHide() && (
-          <button
-            type="button"
-            onClick={() => {
-              column.toggleVisibility(false);
-              setOpen(false);
-            }}
-            className="mt-2 flex w-full items-center gap-2 rounded-lg border-t border-gray-200 px-1 pt-2 text-sm font-medium text-gray-600 hover:text-gray-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:text-white"
-          >
-            <EyeOff className="h-4 w-4" />
-            {t("hideColumn")}
-          </button>
-        )}
       </PopoverContent>
     </Popover>
   );
