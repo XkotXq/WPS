@@ -114,6 +114,7 @@
       "historyLocation": "Lokalizacja",
       "historyOperator": "Wykonał",
       "historyTime": "Data i godzina",
+      "historyUnitId": "Numer jednostki",
       "status": "Status",
       "yes": "Tak",
       "no": "Nie"
@@ -135,7 +136,7 @@
       "showFull": "Pokaż pełną nazwę",
       "columns": "Kolumny",
       "resetColumnWidth": "Przeciągnij, aby zmienić szerokość - kliknij dwukrotnie, aby przywrócić domyślną",
-      "exportExcel": "Eksportuj do Excel",
+      "exportExcel": "Eksportuj",
       "exporting": "Eksportowanie…"
     },
     "filters": {
@@ -310,12 +311,18 @@
       "issue": "Wydaj"
     },
     "receivePanel": {
-      "title": "Dodaj przyjęcie",
+      "title": "Przyjęcie materiału",
       "itemNoLabel": "Numer itemu",
       "itemNameLabel": "Nazwa materiału",
       "quantityLabel": "Ilość",
       "locationLabel": "Lokalizacja",
       "unitIdLabel": "Numer jednostki",
+      "modeSingle": "Pojedyncze przyjęcie",
+      "modeBulk": "Masowe przyjęcie",
+      "addRow": "+ Dodaj wiersz",
+      "removeSelected": "Usuń zaznaczone ({count})",
+      "import": "Importuj",
+      "importError": "Nie udało się odczytać pliku. Sprawdź format i spróbuj ponownie.",
       "save": "Zapisz",
       "cancel": "Anuluj"
     },
@@ -344,6 +351,7 @@
     },
     "toast": {
       "received": "Przyjęto {itemName} ({quantity}).",
+      "receivedBulk": "Przyjęto {count} pozycji.",
       "issued": "Wydano {itemName} ({quantity}).",
       "issuedUnits": "Wydano {count} jednostek materiału {itemName}.",
       "issuedBulk": "Wydano {count} pozycji."
@@ -355,7 +363,11 @@
   },
   "materialsHistorySm": {
     "title": "Historia operacji SM",
-    "subtitle": "Tutaj pojawi się historia operacji śledzonych przez Stock Manager. Ta sekcja jest w przygotowaniu."
+    "subtitle": "Przyjęcia i wydania zarejestrowane w Materiałach SM na tym urządzeniu.",
+    "count": "Pozycji: {count}",
+    "operationIn": "Przyjęcie",
+    "operationOut": "Wydanie",
+    "empty": "Brak zarejestrowanych operacji. Przyjęcia i wydania z Materiałów SM będą pojawiać się tutaj."
   },
   "materialsHistory": {
     "title": "Historia operacji",

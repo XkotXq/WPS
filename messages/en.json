@@ -114,6 +114,7 @@
       "historyLocation": "Location",
       "historyOperator": "Handled by",
       "historyTime": "Date & time",
+      "historyUnitId": "Unit number",
       "status": "Status",
       "yes": "Yes",
       "no": "No"
@@ -135,7 +136,7 @@
       "showFull": "Show full name",
       "columns": "Columns",
       "resetColumnWidth": "Drag to resize - double-click to reset to default",
-      "exportExcel": "Export to Excel",
+      "exportExcel": "Export",
       "exporting": "Exporting…"
     },
     "filters": {
@@ -310,12 +311,18 @@
       "issue": "Issue"
     },
     "receivePanel": {
-      "title": "Add receipt",
+      "title": "Material receipt",
       "itemNoLabel": "Item number",
       "itemNameLabel": "Material name",
       "quantityLabel": "Quantity",
       "locationLabel": "Location",
       "unitIdLabel": "Unit number",
+      "modeSingle": "Single receipt",
+      "modeBulk": "Bulk receipt",
+      "addRow": "+ Add row",
+      "removeSelected": "Remove selected ({count})",
+      "import": "Import",
+      "importError": "Couldn't read the file. Check the format and try again.",
       "save": "Save",
       "cancel": "Cancel"
     },
@@ -344,6 +351,7 @@
     },
     "toast": {
       "received": "Received {itemName} ({quantity}).",
+      "receivedBulk": "Received {count} items.",
       "issued": "Issued {itemName} ({quantity}).",
       "issuedUnits": "Issued {count} units of {itemName}.",
       "issuedBulk": "Issued {count} items."
@@ -355,7 +363,11 @@
   },
   "materialsHistorySm": {
     "title": "SM Operation History",
-    "subtitle": "The operation history tracked by Stock Manager will be shown here. This section is coming soon."
+    "subtitle": "Receipts and issues recorded in SM Materials on this device.",
+    "count": "Items: {count}",
+    "operationIn": "Receipt",
+    "operationOut": "Issue",
+    "empty": "No operations recorded yet. Receipts and issues from SM Materials will show up here."
   },
   "materialsHistory": {
     "title": "Operation History",

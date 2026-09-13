@@ -158,9 +158,28 @@ export default function MaterialsTable({
   // jump the moment you grab the handle. flushSync forces the seed to
   // commit before getResizeHandler() reads the size, since that read
   // happens synchronously inside the same call.
+  //
+  // The very first resize in a table also seeds *every other* column's
+  // current width, not just the one being dragged, and that's what flips
+  // the table over to table-layout:fixed (see className on <Table> below).
+  // table-layout:auto (the default) always widens a column to fit its
+  // longest unbreakable word/number no matter what width is requested -
+  // that's the "can't narrow past long text" bug this works around; fixed
+  // layout makes an explicit width authoritative so the cell has to wrap
+  // instead. Seeding every column with its own current size first means
+  // that switch is a visual no-op - only the dragged column actually moves.
   function startResize(event, header) {
     event.stopPropagation();
-    if (columnSizing[header.column.id] === undefined) {
+    if (Object.keys(columnSizing).length === 0) {
+      const row = event.currentTarget.closest("tr");
+      const seeded = {};
+      row?.querySelectorAll("[data-column-id]").forEach((th) => {
+        seeded[th.dataset.columnId] = th.getBoundingClientRect().width;
+      });
+      if (Object.keys(seeded).length > 0) {
+        flushSync(() => setColumnSizing(seeded));
+      }
+    } else if (columnSizing[header.column.id] === undefined) {
       const measured = event.currentTarget.closest("th")?.getBoundingClientRect().width;
       if (measured) {
         flushSync(() => {
@@ -385,7 +404,10 @@ export default function MaterialsTable({
   return (
     <div>
       <div className={bleed ? "-mx-8" : undefined}>
-      <Table containerClassName="max-h-[60vh] overflow-y-auto">
+      <Table
+        containerClassName="max-h-[60vh] overflow-y-auto"
+        className={Object.keys(columnSizing).length > 0 ? "table-fixed" : undefined}
+      >
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow
@@ -404,6 +426,7 @@ export default function MaterialsTable({
                 return (
                   <TableHead
                     key={header.id}
+                    data-column-id={header.column.id}
                     style={resizedWidth ? { width: resizedWidth, minWidth: resizedWidth, maxWidth: resizedWidth } : undefined}
                     className={`sticky top-0 h-11 bg-gray-50 px-4 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:bg-neutral-800 dark:text-neutral-400 ${
                       bleed ? "first:pl-8 last:pr-8" : ""
@@ -543,7 +566,13 @@ export default function MaterialsTable({
                           : ""
                       } ${config?.className ?? ""}`}
                     >
-                      <table.FlexRender cell={cell} />
+                      {!isActionsCol && resizedWidth ? (
+                        <span className="line-clamp-5">
+                          <table.FlexRender cell={cell} />
+                        </span>
+                      ) : (
+                        <table.FlexRender cell={cell} />
+                      )}
                     </TableCell>
                   );
                 })}

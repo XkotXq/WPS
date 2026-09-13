@@ -37,6 +37,13 @@ export default async function RootLayout({ children }) {
             <Providers>{children}</Providers>
           </NextIntlClientProvider>
         </ThemeProvider>
+        {/* glide-data-grid's cell editor overlay portals here by default
+          (BulkReceiveGrid.js) - it must be a direct child of <body>, not
+          nested inside anything with a CSS transform (like a centered
+          Dialog's translate-x/-y), since a transform creates a new
+          containing block for position:fixed descendants and would throw
+          the overlay's computed position off. */}
+        <div id="portal" />
       </body>
     </html>
   );

@@ -48,7 +48,7 @@ export default function DashboardLayout({ children }) {
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState(null);
-  
+
   const mruRef = useRef([]);
 
   useEffect(() => {
