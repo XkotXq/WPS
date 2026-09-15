@@ -297,6 +297,7 @@
       "itemName": "Nazwa",
       "materialNumber": "Numer materiału",
       "unitId": "Numer jednostki",
+      "productBatch": "Numer partii",
       "quantity": "Ilość",
       "location": "Lokalizacja",
       "note": "Notatka",
@@ -358,7 +359,7 @@
     },
     "notePanel": {
       "noteLabel": "Notatka",
-      "placeholder": "np. Dostawa opóźniona, sprawdzić przy następnym przyjęciu..."
+      "placeholder": ""
     }
   },
   "materialsHistorySm": {

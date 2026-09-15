@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToastStack, useToastStack } from "@/components/ui/toast";
-import BulkReceiveGrid from "@/components/BulkReceiveGrid";
+import BulkReceiveGrid, { newBulkReceiveRow } from "@/components/BulkReceiveGrid";
 import { downloadStockXlsx } from "@/lib/xlsxExport";
 import { SM_INITIAL_ITEMS } from "@/lib/smMaterialsSeed";
 import { getCipSession } from "@/lib/cipSession";
@@ -61,15 +61,6 @@ const ROW_ACTION_CLS =
 // takes effect without needing a flex wrapper around it.
 function ChevronSpacer() {
   return <span className="inline-block h-3.5 w-3.5" />;
-}
-
-// Module-level counter (not per-render state) so ids stay unique across
-// the whole session, including rows added by both "+ Dodaj wiersz" and a
-// bulk file import - mirrors makeSmHistoryId's same reasoning.
-let bulkRowSeq = 0;
-function newBulkReceiveRow() {
-  bulkRowSeq += 1;
-  return { id: `bulk-${bulkRowSeq}`, itemNo: "", itemName: "", quantity: "", location: "", unitId: "" };
 }
 
 // Pure (module-level, not component-closure) so BodyRow below can stay a
@@ -267,7 +258,12 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateBulk, items, t
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={receiveMode === "bulk" ? "max-w-2xl" : undefined}>
+      {/* Wide enough that the grid's 5 columns (itemNo 150 + itemName 220 +
+        quantity 90 + location 100 + unitId 130 = 690px) plus its checkbox
+        row-marker column fit without the grid's own horizontal scrollbar -
+        max-w-2xl (672px minus the dialog's p-5 padding) was too narrow and
+        always clipped the last column or two. */}
+      <DialogContent className={receiveMode === "bulk" ? "max-w-4xl" : undefined}>
         <DialogHeader>
           <DialogTitle>{t("receivePanel.title")}</DialogTitle>
         </DialogHeader>
@@ -461,30 +457,23 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, t }) {
   );
 }
 
-// Materials tracked as one combined quantity (no individual units - e.g.
-// thread sold by weight) can be issued partially: a quantity input caps at
-// what's left, and the item keeps its remaining amount instead of getting
-// removed outright. A single physical unit (a spool, a bigbag) has no such
-// partial concept here - issuing one always removes that whole unit.
+// Every material's issue quantity is editable here, prefilled with its
+// full available amount (same as IssueGroupPanel's per-unit inputs) so
+// the common case - issue everything - needs no typing, but can be
+// lowered to issue only part of it.
 function IssueUnitPanel({ row, open, onOpenChange, onIssue, t }) {
   const [quantity, setQuantity] = useState("");
   const [error, setError] = useState("");
-  const isAggregate = row?.kind === "aggregate";
 
   useEffect(() => {
     if (!row) return;
-    setQuantity("");
+    setQuantity(String(row.quantity ?? ""));
     setError("");
   }, [row]);
 
   if (!row) return null;
 
   function handleConfirm() {
-    if (!isAggregate) {
-      onIssue(row);
-      onOpenChange(false);
-      return;
-    }
     const available = parseFloat(row.quantity);
     const value = parseFloat(quantity.trim().replace(",", "."));
     if (!Number.isFinite(value) || value <= 0) {
@@ -506,18 +495,43 @@ function IssueUnitPanel({ row, open, onOpenChange, onIssue, t }) {
           <DialogTitle>{t("issuePanel.title")}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-1 flex-col justify-center gap-5 overflow-y-auto">
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-6 py-8 text-center dark:border-neutral-800 dark:bg-neutral-800/50">
-            <div>
-              <p className="text-base font-semibold text-gray-900 dark:text-neutral-100">{row.unitId ?? row.itemName}</p>
-              <p className="text-xs text-gray-400 dark:text-neutral-500">{row.unitId ? row.itemName : row.itemNo}</p>
-            </div>
-            {!isAggregate && <p className="text-2xl font-semibold tabular-nums text-gray-900 dark:text-neutral-100">{row.quantity}</p>}
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+          <div className="overflow-hidden rounded-md border border-gray-200 dark:border-neutral-700">
+            <dl className="divide-y divide-gray-100 dark:divide-neutral-800">
+              <div className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                <dt className="text-gray-500 dark:text-neutral-400">{t("columns.itemName")}</dt>
+                <dd className="font-medium text-gray-900 dark:text-neutral-100">{row.itemName}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                <dt className="text-gray-500 dark:text-neutral-400">{t("columns.itemNo")}</dt>
+                <dd className="font-medium text-gray-900 dark:text-neutral-100">{row.itemNo}</dd>
+              </div>
+              {row.unitId && (
+                <div className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                  <dt className="text-gray-500 dark:text-neutral-400">{t("columns.unitId")}</dt>
+                  <dd className="font-mono font-medium text-gray-900 dark:text-neutral-100">{row.unitId}</dd>
+                </div>
+              )}
+              {row.productBatch && (
+                <div className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                  <dt className="text-gray-500 dark:text-neutral-400">{t("columns.productBatch")}</dt>
+                  <dd className="font-medium text-gray-900 dark:text-neutral-100">{row.productBatch}</dd>
+                </div>
+              )}
+              {row.note && row.note !== "-" && (
+                <div className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                  <dt className="text-gray-500 dark:text-neutral-400">{t("notePanel.noteLabel")}</dt>
+                  <dd className="text-right font-medium text-gray-900 dark:text-neutral-100">{row.note}</dd>
+                </div>
+              )}
+            </dl>
           </div>
 
-          {isAggregate && (
-            <label className="flex flex-col gap-1">
-              <span className={LABEL_CLS}>{t("issuePanel.quantityLabel")}</span>
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLS}>{t("issuePanel.quantityLabel")}</span>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 tabular-nums text-sm font-medium text-gray-900 dark:text-neutral-100">{row.quantity}</span>
+              <span className="shrink-0 text-gray-400 dark:text-neutral-500">/</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -525,11 +539,11 @@ function IssueUnitPanel({ row, open, onOpenChange, onIssue, t }) {
                 placeholder={row.quantity}
                 value={quantity}
                 onChange={(e) => setQuantity(sanitizeQuantityInput(e.target.value))}
-                className={FIELD_CLS}
+                className={`${FIELD_CLS} flex-1 min-w-0`}
               />
-              {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-            </label>
-          )}
+            </div>
+            {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+          </label>
         </div>
 
         <DialogFooter>
@@ -550,10 +564,18 @@ function IssueUnitPanel({ row, open, onOpenChange, onIssue, t }) {
 // at once, instead of opening each unit's own issue panel one at a time.
 function IssueGroupPanel({ item, open, onOpenChange, onIssue, t }) {
   const [selected, setSelected] = useState(() => new Set());
+  // Every unit's own quantity is prefilled here (unlike IssueUnitPanel's
+  // blank single-unit input) - a group listing already shows each unit's
+  // full amount as plain text, so defaulting the input to that same value
+  // costs nothing and still lets a partial amount be typed instead.
+  const [quantities, setQuantities] = useState({});
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (!item) return;
     setSelected(new Set());
+    setQuantities(Object.fromEntries(item.units.map((u) => [u.id, String(u.quantity)])));
+    setErrors({});
   }, [item]);
 
   if (!item) return null;
@@ -571,6 +593,28 @@ function IssueGroupPanel({ item, open, onOpenChange, onIssue, t }) {
 
   function toggleAll(checked) {
     setSelected(checked ? new Set(item.units.map((u) => u.id)) : new Set());
+  }
+
+  function setQuantity(id, value) {
+    setQuantities((prev) => ({ ...prev, [id]: sanitizeQuantityInput(value) }));
+    setErrors((prev) => (prev[id] ? { ...prev, [id]: undefined } : prev));
+  }
+
+  function handleConfirm() {
+    const nextErrors = {};
+    selected.forEach((id) => {
+      const u = item.units.find((unit) => unit.id === id);
+      const value = parseFloat((quantities[id] ?? "").trim().replace(",", "."));
+      const available = parseFloat(u.quantity);
+      if (!Number.isFinite(value) || value <= 0) nextErrors[id] = t("issuePanel.requiredQuantity");
+      else if (value > available) nextErrors[id] = t("issuePanel.maxQuantity", { max: u.quantity });
+    });
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+    onIssue(item, [...selected].map((id) => ({ id, quantity: quantities[id].trim() })));
+    onOpenChange(false);
   }
 
   return (
@@ -597,14 +641,26 @@ function IssueGroupPanel({ item, open, onOpenChange, onIssue, t }) {
 
           <div className="flex flex-col gap-1">
             {item.units.map((u) => (
-              <label
-                key={u.id}
-                className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
-              >
-                <Checkbox checked={selected.has(u.id)} onCheckedChange={() => toggleUnit(u.id)} />
-                <span className="font-medium">{u.unitId}</span>
-                <span className="text-gray-400 dark:text-neutral-500">{u.quantity}</span>
-              </label>
+              <div key={u.id} className="flex items-center gap-2 rounded-lg px-1 py-1.5 hover:bg-gray-50 dark:hover:bg-neutral-800">
+                <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-neutral-200">
+                  <Checkbox checked={selected.has(u.id)} onCheckedChange={() => toggleUnit(u.id)} />
+                  <span className="font-medium">{u.unitId}</span>
+                </label>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="tabular-nums text-sm text-gray-400 dark:text-neutral-500">{u.quantity}</span>
+                    <span className="text-gray-300 dark:text-neutral-600">/</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={quantities[u.id] ?? ""}
+                      onChange={(e) => setQuantity(u.id, e.target.value)}
+                      className={`${FIELD_CLS.replace("w-full", "w-20").replace("px-3", "px-1")} h-9 text-right`}
+                    />
+                  </div>
+                  {errors[u.id] && <p className="text-xs text-red-600 dark:text-red-400">{errors[u.id]}</p>}
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -613,14 +669,7 @@ function IssueGroupPanel({ item, open, onOpenChange, onIssue, t }) {
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {t("issuePanel.cancel")}
           </Button>
-          <Button
-            size="sm"
-            disabled={selected.size === 0}
-            onClick={() => {
-              onIssue(item, selected);
-              onOpenChange(false);
-            }}
-          >
+          <Button size="sm" disabled={selected.size === 0} onClick={handleConfirm}>
             {t("issueGroupPanel.confirm", { count: selected.size })}
           </Button>
         </SheetFooter>
@@ -812,7 +861,7 @@ const BodyRow = memo(function BodyRow({
 
   if (row.kind === "flatUnit") {
     const { item, unit: u } = row;
-    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: u.quantity, note: u.note };
+    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, productBatch: u.productBatch, quantity: u.quantity, note: u.note };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         <TableCell className="pl-8">
@@ -842,7 +891,7 @@ const BodyRow = memo(function BodyRow({
 
   if (row.kind === "singleUnit") {
     const { item, unit: u } = row;
-    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: u.quantity, note: u.note };
+    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, productBatch: u.productBatch, quantity: u.quantity, note: u.note };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         <TableCell className="w-8 pl-8">
@@ -1228,7 +1277,7 @@ export default function SmMaterialsPanel() {
       }
       item.units.forEach((u) => {
         if (selectedIds.has(u.id)) {
-          rows.push({ kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, unitType: u.unitType, quantity: u.quantity });
+          rows.push({ kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, unitType: u.unitType, productBatch: u.productBatch, quantity: u.quantity });
         }
       });
     });
@@ -1240,7 +1289,7 @@ export default function SmMaterialsPanel() {
   // same running items array) - same shape as issueRow below.
   function receiveUnit(itemsArr, unit) {
     const idx = itemsArr.findIndex((it) => it.itemNo === unit.itemNo);
-    const newUnit = { id: unit.id, unitType: unit.unitType, unitId: unit.unitId, quantity: unit.quantity, note: "-", cipStatus: "match" };
+    const newUnit = { id: unit.id, unitType: unit.unitType, unitId: unit.unitId, productBatch: unit.productBatch ?? "", quantity: unit.quantity, note: "-", cipStatus: "match" };
     if (idx === -1) {
       return [
         { itemNo: unit.itemNo, itemName: unit.itemName, locationCode: unit.locationCode, note: "-", trackedIndividually: true, units: [newUnit] },
@@ -1342,18 +1391,19 @@ export default function SmMaterialsPanel() {
   }
 
   // Same as handleIssue, batched - the group row's own "Wydaj" picks any
-  // number of its units to issue at once instead of one at a time.
-  function handleIssueUnits(item, unitIds) {
-    const issuedUnits = item.units.filter((u) => unitIds.has(u.id));
-    setItems((prev) =>
-      prev
-        .map((it) => (it.itemNo === item.itemNo ? { ...it, units: it.units.filter((u) => !unitIds.has(u.id)) } : it))
-        .filter((it) => (it.trackedIndividually ? it.units.length > 0 : true))
-    );
+  // number of its units to issue at once instead of one at a time, each
+  // with its own (editable, prefilled-to-full) quantity - reduced through
+  // the same issueRow used everywhere else so a smaller amount shrinks the
+  // unit instead of always removing it outright.
+  function handleIssueUnits(item, entries) {
+    setItems((prev) => entries.reduce((acc, { id, quantity }) => issueRow(acc, { kind: "unit", itemNo: item.itemNo, id }, quantity), prev));
     logOperation(
-      issuedUnits.map((u) => ({ operation: "issue", itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: u.quantity, location: item.locationCode }))
+      entries.map(({ id, quantity }) => {
+        const u = item.units.find((unit) => unit.id === id);
+        return { operation: "issue", itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: quantity ?? u.quantity, location: item.locationCode };
+      })
     );
-    pushToast(t("toast.issuedUnits", { count: unitIds.size, itemName: item.itemName }));
+    pushToast(t("toast.issuedUnits", { count: entries.length, itemName: item.itemName }));
   }
 
   // Cross-item bulk issue - each selected leaf row (unit or whole

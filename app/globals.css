@@ -148,3 +148,13 @@
     @apply font-sans;
   }
 }
+
+/* glide-data-grid's cell overlay editor (BulkReceiveGrid.js) ships with no
+   z-index of its own, so it stacks purely by DOM order relative to the
+   grid's <canvas> - in this app that order comes out wrong and the canvas
+   paints over the editor, hiding whatever is typed until the edit commits
+   and the canvas redraws the cell. Forcing it above fixes that without
+   touching the library. */
+.gdg-style {
+  z-index: 9999;
+}

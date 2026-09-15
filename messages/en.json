@@ -297,6 +297,7 @@
       "itemName": "Name",
       "materialNumber": "Material number",
       "unitId": "Unit number",
+      "productBatch": "Batch number",
       "quantity": "Quantity",
       "location": "Location",
       "note": "Note",
@@ -358,7 +359,7 @@
     },
     "notePanel": {
       "noteLabel": "Note",
-      "placeholder": "e.g. Delivery delayed, check on next receipt..."
+      "placeholder": ""
     }
   },
   "materialsHistorySm": {
