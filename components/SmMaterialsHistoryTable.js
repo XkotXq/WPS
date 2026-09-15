@@ -9,9 +9,15 @@ import { SM_HISTORY_SEED, SM_HISTORY_STORAGE_KEY } from "@/lib/smOperationHistor
 
 // Plain text, not a pill - unlike CipMaterialsHistoryTable's own
 // OperationBadge, which tags "InStorage"/"OutStorage" with a colored pill.
+// "labeling" is the second half of the order workflow (see AGENTS.md):
+// assigning a spool number to quantity already counted at "receipt" time
+// (AssignSpoolNumbersPanel) - it doesn't change stock, so it's its own
+// operation kind rather than another "receipt".
+const OPERATION_LABEL_KEYS = { receipt: "operationIn", issue: "operationOut", labeling: "operationLabeling" };
+
 function OperationLabel({ operation }) {
   const t = useTranslations("materialsHistorySm");
-  return <span className="text-gray-700 dark:text-neutral-200">{operation === "receipt" ? t("operationIn") : t("operationOut")}</span>;
+  return <span className="text-gray-700 dark:text-neutral-200">{t(OPERATION_LABEL_KEYS[operation] ?? "operationIn")}</span>;
 }
 
 // "YYYY-MM-DD HH:mm:ss" in local time - same shape as CIP's own

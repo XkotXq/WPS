@@ -4,20 +4,42 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataEditor, CompactSelection, GridCellKind } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { Trash2 } from "lucide-react";
+import { sanitizeQuantityInput } from "@/lib/quantityInput";
 
 // Column order fixed here - getCellContent/applyEdits both index into a row
 // object by this same array, so adding/reordering a column only ever
 // needs a change in one place.
-const COLUMN_FIELDS = ["itemNo", "itemName", "quantity", "location", "unitId"];
+const COLUMN_FIELDS = ["itemNo", "itemName", "quantity", "location"];
 
 // Shared with SmMaterialsPanel.js (which seeds the initial 3 rows and
 // appends one per "Dodaj wiersz" click) so there is one row shape/id
 // sequence, not two - also what onPaste below grows the array with when a
 // pasted block covers more rows than currently exist.
+//
+// No unitId column - this grid is the "Przyjęcie zamówienia" (order
+// receipt) flow, and the real paper/CIP order list this mirrors never
+// carries spool numbers (see AGENTS.md's "Materiały SM" section): it
+// only ever gives item + summed quantity. Individual spool numbers get
+// assigned later, per item, once the physical spools are labeled - see
+// AssignSpoolNumbersPanel.
 let bulkRowSeq = 0;
 export function newBulkReceiveRow() {
   bulkRowSeq += 1;
-  return { id: `bulk-${bulkRowSeq}`, itemNo: "", itemName: "", quantity: "", location: "", unitId: "" };
+  return { id: `bulk-${bulkRowSeq}`, itemNo: "", itemName: "", quantity: "", location: "" };
+}
+
+// Excel/Sheets-style "always one spare row" - once every row has something
+// in it there is nowhere left to type the next order line without an
+// explicit "Dodaj wiersz" click first. Appending here (inside commitRows,
+// so every write path gets it for free) means a fresh empty row shows up
+// the moment the last free one stops being empty, not only when a paste
+// happens to fill every row exactly.
+function isRowEmpty(row) {
+  return COLUMN_FIELDS.every((field) => !row[field]);
+}
+
+function ensureSpareRow(rowsArr) {
+  return rowsArr.some(isRowEmpty) ? rowsArr : [...rowsArr, newBulkReceiveRow()];
 }
 
 // glide-data-grid's own built-in text-cell editor (a "growing-entry"
@@ -33,8 +55,12 @@ export function newBulkReceiveRow() {
 // and commit/cancel plumbing (onFinishedEditing) still come from glide.
 const SM_TEXT_CELL_KIND = "sm-text-cell";
 
-function makeTextCell(value) {
-  return { kind: GridCellKind.Custom, allowOverlay: true, copyData: value, data: { kind: SM_TEXT_CELL_KIND, value } };
+// `invalid` is a render-only flag (not row state) - set by getCellContent
+// for an Ilość/Lokalizacja cell that's empty on an otherwise-started row,
+// so the offending cells are visibly flagged instead of only blocking the
+// dialog's Zapisz button with no indication of which cell needs filling.
+function makeTextCell(value, invalid = false) {
+  return { kind: GridCellKind.Custom, allowOverlay: true, copyData: value, data: { kind: SM_TEXT_CELL_KIND, value, invalid } };
 }
 
 function SmTextCellEditor({ value, onChange, onFinishedEditing }) {
@@ -68,6 +94,10 @@ const smTextCellRenderer = {
     ctx.beginPath();
     ctx.rect(rect.x, rect.y, rect.width, rect.height);
     ctx.clip();
+    if (cell.data.invalid) {
+      ctx.fillStyle = "rgba(220, 38, 38, 0.16)";
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    }
     ctx.fillStyle = theme.textDark;
     ctx.font = theme.baseFontFull;
     ctx.textBaseline = "middle";
@@ -167,25 +197,51 @@ const ROW_HEIGHT = 34;
 const HEADER_HEIGHT = 36;
 const MAX_VISIBLE_ROWS = 10;
 
-export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
+export default function BulkReceiveGrid({ rows, onChange, onAddRow, onLookupItemName, t }) {
   const isDark = useIsDarkMode();
   const [containerRef, containerSize] = useElementSize();
   const [gridSelection, setGridSelection] = useState({ columns: CompactSelection.empty(), rows: CompactSelection.empty() });
-  const gridHeight = HEADER_HEIGHT + Math.min(Math.max(rows.length, 1), MAX_VISIBLE_ROWS) * ROW_HEIGHT;
+  // +2px slack: glide's own internal scroller div lands ~1-2px shorter
+  // than its scrollHeight due to subpixel rounding (confirmed via its
+  // computed style), so an exact rows*ROW_HEIGHT match still triggers a
+  // vertical scrollbar on a grid that isn't actually scrolled - the slack
+  // is well under one row's height so it doesn't draw an extra empty row.
+  const gridHeight = HEADER_HEIGHT + Math.min(Math.max(rows.length, 1), MAX_VISIBLE_ROWS) * ROW_HEIGHT + 2;
+
+  // Mirrors `rows` but updated synchronously (not through React's render
+  // cycle) at every write below - handleGridSelectionChange needs the
+  // *just-written* itemNo the instant a cell is left, and reading the
+  // `rows` prop there risks a stale pre-edit snapshot when glide commits
+  // an edit and advances the selection as part of the same Tab/click (both
+  // callbacks can fire before React re-renders in between).
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+
+  function commitRows(next) {
+    const withSpare = ensureSpareRow(next);
+    rowsRef.current = withSpare;
+    onChange(withSpare);
+  }
 
   const columns = useMemo(
     () => [
-      { title: t("columns.itemNo"), id: "itemNo", width: 150 },
-      { title: t("columns.itemName"), id: "itemName", width: 220, grow: 1 },
-      { title: t("columns.quantity"), id: "quantity", width: 90 },
-      { title: t("columns.location"), id: "location", width: 100 },
-      { title: t("columns.unitId"), id: "unitId", width: 130 },
+      { title: t("columns.itemNo"), id: "itemNo", width: 170 },
+      { title: t("columns.itemName"), id: "itemName", width: 260, grow: 1 },
+      { title: t("columns.quantity"), id: "quantity", width: 100 },
+      { title: t("columns.location"), id: "location", width: 120 },
     ],
     [t]
   );
 
   const getCellContent = useCallback(
-    ([col, row]) => makeTextCell(rows[row]?.[COLUMN_FIELDS[col]] ?? ""),
+    ([col, row]) => {
+      const field = COLUMN_FIELDS[col];
+      const rowData = rows[row];
+      const value = rowData?.[field] ?? "";
+      const isStarted = rowData && COLUMN_FIELDS.some((f) => rowData[f].trim());
+      const invalid = isStarted && (field === "quantity" || field === "location") && !value.trim();
+      return makeTextCell(value, invalid);
+    },
     [rows]
   );
 
@@ -202,6 +258,16 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
   // what was there before.
   const typingCellRef = useRef(null);
 
+  // The "Ilość" column only ever holds a plain number (optionally with a
+  // decimal part - see lib/quantityInput.js) - every write path into
+  // `rows` below runs a field's new value through this first so a comma
+  // typed/pasted there always becomes a decimal point instead of silently
+  // truncating the value later (parseFloat("146,4") is 146, not 146.4),
+  // and any non-numeric character just never lands in the cell at all.
+  function sanitizeField(field, value) {
+    return field === "quantity" ? sanitizeQuantityInput(value) : value;
+  }
+
   function handleGridKeyDown(event) {
     const [col, row] = event.location ?? [];
     const field = COLUMN_FIELDS[col];
@@ -212,7 +278,7 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
     if (event.key === "Escape" && isSameCell) {
       const next = rows.map((r) => ({ ...r }));
       next[row][field] = typing.original;
-      onChange(next);
+      commitRows(next);
       typingCellRef.current = null;
       event.preventDefault();
       event.stopPropagation();
@@ -222,7 +288,7 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
     if (event.key === "Backspace" && isSameCell) {
       const next = rows.map((r) => ({ ...r }));
       next[row][field] = rows[row][field].slice(0, -1);
-      onChange(next);
+      commitRows(next);
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -231,13 +297,21 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
     if (event.key.length !== 1 || event.ctrlKey || event.metaKey) return;
 
     const next = rows.map((r) => ({ ...r }));
-    if (isSameCell) {
-      next[row][field] = rows[row][field] + event.key;
-    } else {
-      typingCellRef.current = { col, row, original: rows[row][field] };
-      next[row][field] = event.key;
+    const base = isSameCell ? rows[row][field] : "";
+    const written = sanitizeField(field, base + event.key);
+    // A rejected character (e.g. a letter typed into Ilość) sanitizes back
+    // to the same string it started from - nothing to write, and critically
+    // *don't* start a fresh typingCellRef for it either, or the very next
+    // (valid) keystroke would wrongly treat itself as "first" and replace
+    // instead of append.
+    if (written === base) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
     }
-    onChange(next);
+    if (!isSameCell) typingCellRef.current = { col, row, original: rows[row][field] };
+    next[row][field] = written;
+    commitRows(next);
     event.preventDefault();
     event.stopPropagation();
   }
@@ -249,9 +323,9 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
     const next = rows.map((row) => ({ ...row }));
     edits.forEach(({ location: [col, row], value }) => {
       const field = COLUMN_FIELDS[col];
-      if (field && next[row]) next[row][field] = value.data?.value ?? "";
+      if (field && next[row]) next[row][field] = sanitizeField(field, value.data?.value ?? "");
     });
-    onChange(next);
+    commitRows(next);
   }
 
   // glide-data-grid never grows the grid on its own when a pasted block
@@ -267,17 +341,43 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
     values.forEach((rowValues, r) => {
       rowValues.forEach((value, c) => {
         const field = COLUMN_FIELDS[startCol + c];
-        if (field) next[startRow + r][field] = value ?? "";
+        if (field) next[startRow + r][field] = sanitizeField(field, value ?? "");
       });
     });
-    onChange(next);
+    commitRows(next);
     return false;
   }
 
   function handleDeleteSelected() {
     if (gridSelection.rows.length === 0) return;
-    onChange(rows.filter((_, index) => !gridSelection.rows.hasIndex(index)));
+    commitRows(rows.filter((_, index) => !gridSelection.rows.hasIndex(index)));
     setGridSelection({ columns: CompactSelection.empty(), rows: CompactSelection.empty() });
+  }
+
+  // "Change focus of the itemNo cell" (leave it for another cell, e.g. via
+  // Tab or a click elsewhere) autofills that row's Nazwa from whatever
+  // material this item number resolves to (current stock, then Katalog
+  // materiałów SM - see SmMaterialsPanel's lookupItemName), same as the
+  // single-receipt form's own itemNo-blur behavior. Reads rowsRef (not the
+  // `rows` prop) because glide can fire this in the same tick as an
+  // onCellEdited/onCellsEdited commit (e.g. Tab-ing out of an open cell
+  // editor both commits the edit and advances the selection) - by the time
+  // that happens rowsRef.current has already been updated synchronously by
+  // commitRows above, so this never reads a stale pre-edit itemNo.
+  function handleGridSelectionChange(newSelection) {
+    const prevCell = gridSelection.current?.cell;
+    if (prevCell && COLUMN_FIELDS[prevCell[0]] === "itemNo" && onLookupItemName) {
+      const newCell = newSelection.current?.cell;
+      const leftCell = !newCell || newCell[0] !== prevCell[0] || newCell[1] !== prevCell[1];
+      const row = rowsRef.current[prevCell[1]];
+      if (leftCell && row) {
+        const name = onLookupItemName(row.itemNo);
+        if (name && row.itemName !== name) {
+          commitRows(rowsRef.current.map((r, i) => (i === prevCell[1] ? { ...r, itemName: name } : r)));
+        }
+      }
+    }
+    setGridSelection(newSelection);
   }
 
   return (
@@ -317,8 +417,17 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, t }) {
           // custom editor doesn't fix this specific path. Double-click or
           // Enter to open a cell for editing isn't affected.
           editOnType={false}
+          // glide's own default "activateCell" hotkey is literally " " (space)
+          // - fires on top of our custom handleGridKeyDown typing path above
+          // (that handler runs first, but has no way to cancel glide's own
+          // follow-up hotkey handling) and reopens the cell's overlay editor
+          // mid-keystroke, which was silently swallowing every space typed
+          // into a cell (confirmed: "FRP 1.8mm/VIP" landed as "FRP1.8mm/VIP").
+          // Restricting activateCell to Enter only removes the conflict; a
+          // real activation entry point (double-click) is untouched.
+          keybindings={{ activateCell: "Enter|shift+Enter" }}
           gridSelection={gridSelection}
-          onGridSelectionChange={setGridSelection}
+          onGridSelectionChange={handleGridSelectionChange}
           theme={isDark ? DARK_THEME : LIGHT_THEME}
           smoothScrollX
           smoothScrollY

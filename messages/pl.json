@@ -26,7 +26,10 @@
     "materialsSm": "Materiały SM",
     "materialsListSm": "Lista materiałów SM",
     "materialsHistorySm": "Historia operacji SM",
-    "ordersCip": "Zamówienia CIP",
+    "materialsCatalogSm": "Katalog materiałów SM",
+    "ordersCip": "Zamówienia",
+    "ordersCipList": "Lista zamówień",
+    "ordersCipHistory": "Historia zamówień",
     "ordersWms": "Wydania WMS",
     "ordersWmsLists": "Listy wydań",
     "search": "Szukaj",
@@ -103,6 +106,8 @@
       "delta": "Δ (km)",
       "materialsItemNo": "Nr itemu",
       "materialsItemName": "Nazwa",
+      "materialsIndividualUnits": "Osobne jednostki",
+      "materialsUnitType": "Forma jednostki",
       "materialsSpec": "Specyfikacja",
       "materialsLocation": "Lokalizacja",
       "materialsCreateTime": "Data utworzenia",
@@ -267,8 +272,31 @@
     "subtitle": "Tutaj pojawią się raporty materiałowe. Ta sekcja jest w przygotowaniu."
   },
   "ordersCip": {
-    "title": "Zamówienia CIP",
-    "subtitle": "Tutaj pojawią się zamówienia z CIP. Ta sekcja jest w przygotowaniu."
+    "title": "Lista zamówień",
+    "subtitle": "Zamówienia złożone do magazynu głównego. Dane demonstracyjne - integracja z CIP jest w przygotowaniu.",
+    "count": "Pozycji: {count}",
+    "columns": {
+      "orderNo": "Numer zamówienia",
+      "status": "Status",
+      "line": "Linia",
+      "employeeNo": "Nr pracownika",
+      "createdAt": "Data utworzenia",
+      "note": "Notatka"
+    },
+    "status": {
+      "new": "Nowe",
+      "inProgress": "W realizacji",
+      "done": "Zrealizowane",
+      "cancelled": "Anulowane"
+    }
+  },
+  "ordersCipHistory": {
+    "title": "Historia zamówień",
+    "subtitle": "Tutaj pojawi się historia zrealizowanych zamówień. Ta sekcja jest w przygotowaniu."
+  },
+  "ordersCipReports": {
+    "title": "Raporty",
+    "subtitle": "Tutaj pojawią się raporty dotyczące zamówień. Ta sekcja jest w przygotowaniu."
   },
   "ordersWms": {
     "title": "Wydania WMS",
@@ -309,7 +337,25 @@
     },
     "actions": {
       "edit": "Edytuj",
-      "issue": "Wydaj"
+      "issue": "Wydaj",
+      "assign": "Przypisz numery jednostek",
+      "confirmDeleteZero": "Usunąć {itemName} z listy? Ilość wynosi 0."
+    },
+    "pending": {
+      "unitLabel": "Brak"
+    },
+    "assignPanel": {
+      "title": "Przypisz numery jednostek",
+      "unitIdLabel": "Numer jednostki",
+      "quantityLabel": "Ilość",
+      "remainingLabel": "Pozostało do przypisania",
+      "overAssigned": "Przypisano więcej niż zamówiono o {quantity}.",
+      "exceedsRemaining": "Ilość przekracza pozostałą do przypisania ({remaining}).",
+      "addRow": "Dodaj",
+      "removeRow": "Usuń",
+      "empty": "Dodaj przynajmniej jedną jednostkę.",
+      "save": "Zapisz",
+      "cancel": "Anuluj"
     },
     "receivePanel": {
       "title": "Przyjęcie materiału",
@@ -319,18 +365,18 @@
       "locationLabel": "Lokalizacja",
       "unitIdLabel": "Numer jednostki",
       "modeSingle": "Pojedyncze przyjęcie",
-      "modeBulk": "Masowe przyjęcie",
+      "modeBulk": "Przyjęcie zamówienia",
       "addRow": "+ Dodaj wiersz",
       "removeSelected": "Usuń zaznaczone ({count})",
-      "import": "Importuj",
-      "importError": "Nie udało się odczytać pliku. Sprawdź format i spróbuj ponownie.",
+      "incompleteRows": "Uzupełnij ilość i lokalizację w każdym rozpoczętym wierszu.",
       "save": "Zapisz",
       "cancel": "Anuluj"
     },
     "editPanel": {
       "title": "Edytuj",
       "save": "Zapisz",
-      "cancel": "Anuluj"
+      "cancel": "Anuluj",
+      "delete": "Usuń"
     },
     "issuePanel": {
       "title": "Wydaj jednostkę",
@@ -353,9 +399,11 @@
     "toast": {
       "received": "Przyjęto {itemName} ({quantity}).",
       "receivedBulk": "Przyjęto {count} pozycji.",
+      "unitsAssigned": "Przypisano {count} jednostek do {itemName}.",
       "issued": "Wydano {itemName} ({quantity}).",
       "issuedUnits": "Wydano {count} jednostek materiału {itemName}.",
-      "issuedBulk": "Wydano {count} pozycji."
+      "issuedBulk": "Wydano {count} pozycji.",
+      "deleted": "Usunięto {itemName} z listy."
     },
     "notePanel": {
       "noteLabel": "Notatka",
@@ -368,7 +416,34 @@
     "count": "Pozycji: {count}",
     "operationIn": "Przyjęcie",
     "operationOut": "Wydanie",
+    "operationLabeling": "Etykietowanie",
     "empty": "Brak zarejestrowanych operacji. Przyjęcia i wydania z Materiałów SM będą pojawiać się tutaj."
+  },
+  "materialsCatalogSm": {
+    "title": "Katalog materiałów SM",
+    "subtitle": "Referencyjna lista materiałów SM - numer itemu i nazwa, używana do podpowiadania nazwy przy przyjęciach. Dodaj tu nowy materiał, zanim zaczniesz go przyjmować.",
+    "count": "Pozycji: {count}",
+    "actions": {
+      "add": "Dodaj materiał",
+      "edit": "Edytuj",
+      "delete": "Usuń",
+      "save": "Zapisz",
+      "confirmDelete": "Usunąć {itemNo} z katalogu?"
+    },
+    "form": {
+      "itemNo": "Nr itemu",
+      "itemName": "Nazwa",
+      "individualUnitsLabel": "Materiał rozdzielony na jednostki",
+      "individualUnitsHint": "Zaznacz, jeśli ilości tego materiału mają być rozdzielone na osobne, numerowane obiekty (np. szpule) zamiast sumować się w jedną łączną wartość.",
+      "unitTypeLabel": "Forma jednostki",
+      "cancel": "Anuluj",
+      "required": "Podaj numer itemu i nazwę.",
+      "duplicate": "Ten numer itemu już jest w katalogu."
+    },
+    "unitTypeSpool": "Szpula",
+    "unitTypeBigbag": "Bigbag",
+    "unitTypeThread": "Nić",
+    "unitTypeOther": "Inna"
   },
   "materialsHistory": {
     "title": "Historia operacji",

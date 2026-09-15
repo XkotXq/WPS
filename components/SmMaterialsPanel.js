@@ -3,7 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useLocalStorage } from "usehooks-ts";
-import { Plus, Pencil, PackageMinus, Search, Download, Upload, ChevronDown, ChevronRight, Layers, List, Filter, Package, Boxes } from "lucide-react";
+import { Plus, Pencil, PackageMinus, Search, Download, ChevronDown, ChevronRight, Layers, List, Filter, Package, Boxes, Tags, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -17,6 +17,8 @@ import { downloadStockXlsx } from "@/lib/xlsxExport";
 import { SM_INITIAL_ITEMS } from "@/lib/smMaterialsSeed";
 import { getCipSession } from "@/lib/cipSession";
 import { SM_HISTORY_LIMIT, SM_HISTORY_SEED, SM_HISTORY_STORAGE_KEY, makeSmHistoryId } from "@/lib/smOperationHistory";
+import { SM_CATALOG_SEED, SM_CATALOG_STORAGE_KEY } from "@/lib/smMaterialsCatalog";
+import { sanitizeQuantityInput } from "@/lib/quantityInput";
 
 // Mock "Materiały SM" seed data (moved to lib/smMaterialsSeed.js) - see
 // SM_INITIAL_ITEMS there for what this concept demonstrates and where the
@@ -35,17 +37,28 @@ function sumQuantity(units) {
 // whether it's a sum of units or a standalone total - used by the quantity
 // range table filter.
 function itemQuantityValue(item) {
-  return parseFloat(item.trackedIndividually ? sumQuantity(item.units) : item.totalQuantity);
+  return parseFloat(item.trackedIndividually ? totalQuantityForItem(item) : item.totalQuantity);
 }
 
-// Keeps only digits and a single decimal separator, normalizing "," to "."
-// - used on every quantity input so the field can only ever hold a number.
-function sanitizeQuantityInput(value) {
-  const cleaned = value.replace(",", ".").replace(/[^\d.]/g, "");
-  const firstDot = cleaned.indexOf(".");
-  if (firstDot === -1) return cleaned;
-  return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+// pendingQuantity is the "Przyjęcie zamówienia" (order receipt) half of
+// the two-phase workflow: quantity already on hand and already counted -
+// see AGENTS.md - just not yet split into individually-numbered spools.
+// Kept as its own field (rather than a fake unit) so an item can carry
+// real units *and* an unassigned remainder at the same time (e.g. a new
+// order for an item that already has labeled spools from a previous one).
+function hasPendingQuantity(item) {
+  return (parseFloat(item.pendingQuantity) || 0) > 0;
 }
+
+// Same "Ilość" total sumQuantity(item.units) would give, but also
+// counting pendingQuantity - so the group row's total always reflects
+// everything actually on hand, labeled or not.
+function totalQuantityForItem(item) {
+  const unitsTotal = item.units.reduce((sum, u) => sum + (parseFloat(u.quantity) || 0), 0);
+  const total = unitsTotal + (parseFloat(item.pendingQuantity) || 0);
+  return total % 1 === 0 ? String(total) : total.toFixed(3);
+}
+
 
 const FIELD_CLS =
   "h-10 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 focus:border-navy-700 dark:focus:border-navy-400 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400 disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-gray-100 disabled:text-gray-400 dark:disabled:border-neutral-800 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-600";
@@ -119,16 +132,14 @@ function UnitInfo({ row, t }) {
 // on a real save this would (1) push item/quantity/location to CIP through
 // its API and (2) keep the unit number here, since CIP has nowhere to put
 // it. For now it only updates local state, to demo the flow.
-function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateBulk, items, t }) {
+function ReceiveUnitPanel({ open, onOpenChange, onCreate, onReceiveOrder, items, catalog, t }) {
   const [itemNo, setItemNo] = useState("");
   const [itemName, setItemName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [location, setLocation] = useState("");
   const [unitId, setUnitId] = useState("");
-  const [importError, setImportError] = useState("");
   const [receiveMode, setReceiveMode] = useState("single");
   const [bulkRows, setBulkRows] = useState(() => [newBulkReceiveRow(), newBulkReceiveRow(), newBulkReceiveRow()]);
-  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -137,7 +148,6 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateBulk, items, t
     setQuantity("");
     setLocation("");
     setUnitId("");
-    setImportError("");
     setReceiveMode("single");
     setBulkRows([newBulkReceiveRow(), newBulkReceiveRow(), newBulkReceiveRow()]);
   }, [open]);
@@ -159,88 +169,56 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateBulk, items, t
 
   // Only rows with every required field filled in count - a half-typed
   // trailing row (e.g. from "+ Dodaj wiersz") is silently skipped rather
-  // than blocking the whole save.
-  const validBulkUnits = bulkRows
-    .filter((row) => row.itemNo.trim() && row.itemName.trim() && row.quantity.trim() && row.unitId.trim())
+  // than blocking the whole save. No unitId here - an order line is a
+  // plain item+quantity, same shape as the real order list this mirrors;
+  // spool numbers get assigned later (see AssignSpoolNumbersPanel).
+  const validOrderEntries = bulkRows
+    .filter((row) => row.itemNo.trim() && row.itemName.trim() && row.quantity.trim() && row.location.trim())
     .map((row) => ({
-      id: `u-${Date.now()}-${row.id}`,
-      unitType: "spool",
       itemNo: row.itemNo.trim(),
       itemName: row.itemName.trim(),
-      unitId: row.unitId.trim(),
       quantity: row.quantity.trim(),
-      locationCode: row.location.trim() || "MT",
+      locationCode: row.location.trim(),
     }));
 
+  // A row the user has started (typed anything into it) must have both
+  // Ilość and Lokalizacja before the order can be saved - unlike a fully
+  // untouched trailing row (silently skipped by validOrderEntries above),
+  // a half-filled one blocks Zapisz instead of quietly dropping data the
+  // user meant to include.
+  const incompleteBulkRows = bulkRows.some(
+    (row) =>
+      (row.itemNo.trim() || row.itemName.trim() || row.quantity.trim() || row.location.trim()) &&
+      (!row.quantity.trim() || !row.location.trim())
+  );
+
   function handleBulkSubmit() {
-    if (validBulkUnits.length === 0) return;
-    onCreateBulk(validBulkUnits);
+    if (validOrderEntries.length === 0 || incompleteBulkRows) return;
+    onReceiveOrder(validOrderEntries);
     onOpenChange(false);
   }
 
-  // Auto-fills the name once the user leaves the item-number field, looked
-  // up against the materials already known to this page - there's no real
-  // backend endpoint for this yet (see AGENTS.md), so this stands in for
-  // one until it exists; swapping in a real fetch later only touches this
-  // function.
-  function handleItemNoBlur() {
-    const trimmed = itemNo.trim();
-    if (!trimmed) return;
-    const match = items.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
-    if (match) setItemName(match.itemName);
+  // Looked up against materials already known to this page - current
+  // stock first (items), then the reference catalog (Katalog materiałów
+  // SM, see lib/smMaterialsCatalog.js) so a material still resolves once
+  // every unit of it has already been issued and it's no longer on the
+  // stock list itself. There's no real backend endpoint for this yet (see
+  // AGENTS.md), so this stands in for one until it exists. Shared by the
+  // single-receipt form below (on blur) and the bulk order-receipt grid
+  // (on leaving the itemNo cell - see BulkReceiveGrid's onLookupItemName).
+  function lookupItemName(rawItemNo) {
+    const trimmed = rawItemNo.trim();
+    if (!trimmed) return undefined;
+    const match =
+      items.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase()) ??
+      catalog.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
+    return match?.itemName;
   }
 
-  // Reads the file and fills the form from it, matching by header label
-  // against the same t("columns.xxx") strings handleExport (below) writes
-  // as its own headers - a file exported from this page's own "Eksportuj"
-  // round-trips straight back in. xlsx-js-style is already a dependency
-  // (lib/xlsxExport.js uses it to write) and reads just as well, so this
-  // needs nothing new installed. Single mode only ever reads the first
-  // data row (one receipt); bulk mode reads every data row straight into
-  // the grid, replacing whatever rows were there.
-  async function handleImportFile(file) {
-    if (!file) return;
-    setImportError("");
-    try {
-      const XLSX = (await import("xlsx-js-style")).default;
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-      const [headerRow, ...dataRows] = rows;
-      if (!headerRow || dataRows.length === 0) throw new Error("empty");
-
-      const header = headerRow.map((cell) => String(cell).trim().toLowerCase());
-      function cellFor(row, label, fallbackIndex) {
-        const index = header.indexOf(label.trim().toLowerCase());
-        const value = row[index === -1 ? fallbackIndex : index];
-        return value === undefined || value === null ? "" : String(value).trim();
-      }
-
-      if (receiveMode === "bulk") {
-        const nonEmptyRows = dataRows.filter((row) => row.some((cell) => String(cell).trim() !== ""));
-        if (nonEmptyRows.length === 0) throw new Error("empty");
-        setBulkRows(
-          nonEmptyRows.map((row) => ({
-            ...newBulkReceiveRow(),
-            itemNo: cellFor(row, t("columns.itemNo"), 0),
-            itemName: cellFor(row, t("columns.itemName"), 1),
-            unitId: cellFor(row, t("columns.unitId"), 2),
-            quantity: sanitizeQuantityInput(cellFor(row, t("columns.quantity"), 3)),
-            location: cellFor(row, t("columns.location"), 4),
-          }))
-        );
-      } else {
-        const dataRow = dataRows[0];
-        setItemNo(cellFor(dataRow, t("columns.itemNo"), 0));
-        setItemName(cellFor(dataRow, t("columns.itemName"), 1));
-        setUnitId(cellFor(dataRow, t("columns.unitId"), 2));
-        setQuantity(sanitizeQuantityInput(cellFor(dataRow, t("columns.quantity"), 3)));
-        setLocation(cellFor(dataRow, t("columns.location"), 4));
-      }
-    } catch {
-      setImportError(t("receivePanel.importError"));
-    }
+  // Auto-fills the name once the user leaves the item-number field.
+  function handleItemNoBlur() {
+    const match = lookupItemName(itemNo);
+    if (match) setItemName(match);
   }
 
   // Escape is how AG Grid cancels an in-progress cell edit - without this,
@@ -258,26 +236,15 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateBulk, items, t
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {/* Wide enough that the grid's 5 columns (itemNo 150 + itemName 220 +
-        quantity 90 + location 100 + unitId 130 = 690px) plus its checkbox
-        row-marker column fit without the grid's own horizontal scrollbar -
-        max-w-2xl (672px minus the dialog's p-5 padding) was too narrow and
-        always clipped the last column or two. */}
+      {/* Wide enough that the grid's 4 columns (itemNo 170 + itemName 260 +
+        quantity 100 + location 120 = 650px) plus its checkbox row-marker
+        column fit without the grid's own horizontal scrollbar - max-w-2xl
+        (672px minus the dialog's p-5 padding) was too narrow and clipped
+        the last column. */}
       <DialogContent className={receiveMode === "bulk" ? "max-w-4xl" : undefined}>
         <DialogHeader>
           <DialogTitle>{t("receivePanel.title")}</DialogTitle>
         </DialogHeader>
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept=".xlsx,.xls,.csv"
-          className="hidden"
-          onChange={(e) => {
-            handleImportFile(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
 
         <div className="inline-flex items-center gap-1 self-start rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 p-1">
           <button
@@ -311,6 +278,7 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateBulk, items, t
             rows={bulkRows}
             onChange={setBulkRows}
             onAddRow={() => setBulkRows((prev) => [...prev, newBulkReceiveRow()])}
+            onLookupItemName={lookupItemName}
             t={t}
           />
         )}
@@ -348,40 +316,37 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateBulk, items, t
           </label>
         </form>
         )}
-        {importError && <p className="text-xs text-red-600 dark:text-red-400">{importError}</p>}
+        {receiveMode === "bulk" && incompleteBulkRows && (
+          <p className="text-xs text-red-600 dark:text-red-400">{t("receivePanel.incompleteRows")}</p>
+        )}
 
-        <DialogFooter className="justify-between">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()}>
-            <Upload className="h-4 w-4" />
-            {t("receivePanel.import")}
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            {t("receivePanel.cancel")}
           </Button>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-              {t("receivePanel.cancel")}
-            </Button>
-            <Button
-              type={receiveMode === "single" ? "submit" : "button"}
-              form={receiveMode === "single" ? "receive-unit-form" : undefined}
-              size="sm"
-              disabled={receiveMode === "bulk" && validBulkUnits.length === 0}
-              onClick={receiveMode === "bulk" ? handleBulkSubmit : undefined}
-            >
-              {t("receivePanel.save")}
-            </Button>
-          </div>
+          <Button
+            type={receiveMode === "single" ? "submit" : "button"}
+            form={receiveMode === "single" ? "receive-unit-form" : undefined}
+            size="sm"
+            disabled={receiveMode === "bulk" && (validOrderEntries.length === 0 || incompleteBulkRows)}
+            onClick={receiveMode === "bulk" ? handleBulkSubmit : undefined}
+          >
+            {t("receivePanel.save")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function EditUnitPanel({ row, open, onOpenChange, onSave, t }) {
+function EditUnitPanel({ row, open, onOpenChange, onSave, onDelete, t }) {
   const [itemName, setItemName] = useState("");
   const [unitId, setUnitId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
   const hasUnitId = row?.kind === "unit";
-  const hasQuantity = row?.kind === "unit" || row?.kind === "aggregate";
+  const hasQuantity = row?.kind === "unit" || row?.kind === "aggregate" || row?.kind === "pending";
+  const canDelete = Boolean(row?.isZero);
 
   useEffect(() => {
     if (!row) return;
@@ -402,19 +367,27 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, t }) {
     onOpenChange(false);
   }
 
+  // Only offered for a whole material (aggregate/groupParent) sitting at
+  // 0 - see `isZero` on those rows' actionRow/itemEditRow in BodyRow. Stays
+  // open if the confirm prompt inside onDelete is cancelled (it reports
+  // back whether the delete actually happened).
+  function handleDeleteClick() {
+    if (onDelete(row)) onOpenChange(false);
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{t("editPanel.title")}</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("editPanel.title")}</DialogTitle>
+        </DialogHeader>
 
         <form id="edit-unit-form" onSubmit={handleSubmit} className="flex flex-1 flex-col gap-3 overflow-y-auto">
           <UnitInfo row={row} t={t} />
 
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLS}>{t("columns.itemName")}</span>
-            <input className={FIELD_CLS} value={itemName} onChange={(e) => setItemName(e.target.value)} />
+            <input className={`${FIELD_CLS} disabled:opacity-60`} value={itemName} disabled />
           </label>
           {hasUnitId && (
             <label className="flex flex-col gap-1">
@@ -444,16 +417,24 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, t }) {
           </label>
         </form>
 
-        <SheetFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            {t("editPanel.cancel")}
-          </Button>
-          <Button type="submit" form="edit-unit-form" size="sm">
-            {t("editPanel.save")}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        <DialogFooter className={canDelete ? "justify-between" : undefined}>
+          {canDelete && (
+            <Button type="button" variant="destructive" size="sm" className="gap-1.5" onClick={handleDeleteClick}>
+              <Trash2 className="h-4 w-4" />
+              {t("editPanel.delete")}
+            </Button>
+          )}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              {t("editPanel.cancel")}
+            </Button>
+            <Button type="submit" form="edit-unit-form" size="sm">
+              {t("editPanel.save")}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -678,6 +659,155 @@ function IssueGroupPanel({ item, open, onOpenChange, onIssue, t }) {
   );
 }
 
+// Second half of the two-phase order workflow (see AGENTS.md): "Przyjęcie
+// zamówienia" (ReceiveUnitPanel's bulk mode) records the aggregate quantity
+// from the morning order the moment it's added to CIP - that's real stock,
+// already on hand, just not yet split into individually-numbered spools.
+// This panel does that split, once the physical spools are labeled: add one
+// spool (its number + the length printed on its own label) at a time,
+// tracking how much of the item's pendingQuantity is still unassigned.
+// Saving converts each added row into a real unit (same shape handleCreate
+// produces) and shrinks pendingQuantity by what was just assigned - it does
+// NOT add new stock, since that quantity was already counted at order-
+// receipt time (see handleAssignUnits).
+function AssignSpoolNumbersPanel({ item, open, onOpenChange, onAssign, t }) {
+  const [draftRows, setDraftRows] = useState([]);
+  const [unitId, setUnitId] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [error, setError] = useState("");
+  const unitIdInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!item) return;
+    setDraftRows([]);
+    setUnitId("");
+    setQuantity("");
+    setError("");
+  }, [item]);
+
+  if (!item) return null;
+
+  const pending = parseFloat(item.pendingQuantity) || 0;
+  const draftTotal = draftRows.reduce((sum, row) => sum + (parseFloat(row.quantity) || 0), 0);
+  const remaining = pending - draftTotal;
+  const remainingFormatted = remaining % 1 === 0 ? String(remaining) : remaining.toFixed(3);
+
+  function handleAddRow(e) {
+    e.preventDefault();
+    if (!unitId.trim() || !quantity.trim()) return;
+    // Blocks the over-assignment at its source (typing a spool's length)
+    // rather than only flagging it after the fact - remaining is already
+    // this row's own quantity subtracted out of pending, so comparing
+    // against it directly catches "more than what's left" with a tiny
+    // epsilon for float rounding (e.g. 0.1 + 0.2 quantities).
+    const value = parseFloat(quantity.trim().replace(",", "."));
+    if (value - remaining > 0.0005) {
+      setError(t("assignPanel.exceedsRemaining", { remaining: remainingFormatted }));
+      return;
+    }
+    setDraftRows((prev) => [...prev, { id: `draft-${Date.now()}`, unitId: unitId.trim(), quantity: quantity.trim() }]);
+    setUnitId("");
+    setQuantity("");
+    setError("");
+    unitIdInputRef.current?.focus();
+  }
+
+  function handleRemoveRow(id) {
+    setDraftRows((prev) => prev.filter((row) => row.id !== id));
+  }
+
+  function handleSave() {
+    if (draftRows.length === 0) {
+      setError(t("assignPanel.empty"));
+      return;
+    }
+    if (remaining < 0) return;
+    onAssign(item, draftRows);
+    onOpenChange(false);
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{t("assignPanel.title")}</SheetTitle>
+        </SheetHeader>
+
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
+          <div className="rounded-lg border border-gray-100 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800/50 p-3 text-sm">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+              <dt className="text-gray-500 dark:text-neutral-400">{t("columns.itemNo")}</dt>
+              <dd className="font-medium text-gray-900 dark:text-neutral-100">{item.itemNo}</dd>
+              <dt className="text-gray-500 dark:text-neutral-400">{t("columns.itemName")}</dt>
+              <dd className="font-medium text-gray-900 dark:text-neutral-100">{item.itemName}</dd>
+              <dt className="text-gray-500 dark:text-neutral-400">{t("assignPanel.remainingLabel")}</dt>
+              <dd className={`font-medium tabular-nums ${remaining < 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-neutral-100"}`}>
+                {remainingFormatted}
+              </dd>
+            </dl>
+          </div>
+          {remaining < 0 && (
+            <p className="text-xs text-red-600 dark:text-red-400">{t("assignPanel.overAssigned", { quantity: Math.abs(remaining).toFixed(3) })}</p>
+          )}
+
+          <form onSubmit={handleAddRow} className="flex items-end gap-2">
+            <label className="flex flex-1 flex-col gap-1">
+              <span className={LABEL_CLS}>{t("assignPanel.unitIdLabel")}</span>
+              <input ref={unitIdInputRef} className={FIELD_CLS} value={unitId} onChange={(e) => setUnitId(e.target.value)} autoFocus />
+            </label>
+            <label className="flex w-28 flex-col gap-1">
+              <span className={LABEL_CLS}>{t("assignPanel.quantityLabel")}</span>
+              <input
+                className={FIELD_CLS}
+                inputMode="decimal"
+                value={quantity}
+                onChange={(e) => setQuantity(sanitizeQuantityInput(e.target.value))}
+              />
+            </label>
+            <Button type="submit" variant="outline" size="sm" className="h-10">
+              {t("assignPanel.addRow")}
+            </Button>
+          </form>
+          {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+
+          {draftRows.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {draftRows.map((row) => (
+                <div
+                  key={row.id}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 dark:bg-neutral-800/50 px-3 py-1.5 text-sm"
+                >
+                  <span className="font-medium text-gray-900 dark:text-neutral-100">{row.unitId}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="tabular-nums text-gray-600 dark:text-neutral-300">{row.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(row.id)}
+                      className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+                      title={t("assignPanel.removeRow")}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <SheetFooter>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            {t("assignPanel.cancel")}
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={remaining < 0}>
+            {t("assignPanel.save")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // Cross-item bulk issue - the toolbar's "Wydaj zaznaczone" opens this for
 // whatever leaf rows (units and/or whole aggregate items) are checked
 // across the table, regardless of which item they belong to. A unit row
@@ -822,11 +952,13 @@ const BodyRow = memo(function BodyRow({
   onEdit,
   onIssue,
   onIssueGroup,
+  onAssignUnits,
 }) {
   if (row.kind === "aggregate") {
     const item = row.item;
     const isGrouped = viewMode === "grouped";
-    const actionRow = { kind: "aggregate", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, quantity: item.totalQuantity, note: item.note };
+    const isZero = !(parseFloat(item.totalQuantity) > 0);
+    const actionRow = { kind: "aggregate", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, quantity: item.totalQuantity, note: item.note, isZero };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         {isGrouped && (
@@ -926,11 +1058,18 @@ const BodyRow = memo(function BodyRow({
 
   if (row.kind === "groupParent") {
     const item = row.item;
-    const itemEditRow = { kind: "item", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, note: item.note };
+    const isZero = item.units.length === 0 && !hasPendingQuantity(item);
+    const itemEditRow = { kind: "item", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, note: item.note, isZero };
     return (
-      <TableRow onClick={() => onToggleItem(item.itemNo)} className="group cursor-pointer">
+      <TableRow onClick={isZero ? undefined : () => onToggleItem(item.itemNo)} className={`group ${isZero ? "" : "cursor-pointer"}`}>
         <TableCell className="w-8 pl-8">
-          {isGroupOpen ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />}
+          {isZero ? (
+            <ChevronSpacer />
+          ) : isGroupOpen ? (
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          )}
         </TableCell>
         <TableCell onClick={(e) => e.stopPropagation()}>
           <Checkbox
@@ -943,7 +1082,7 @@ const BodyRow = memo(function BodyRow({
         <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "itemName")}`}>
           <span className={nameCls(columnSizing)}>{item.itemName}</span>
         </TableCell>
-        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "quantity")}`}>{sumQuantity(item.units)}</TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "quantity")}`}>{totalQuantityForItem(item)}</TableCell>
         <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "location")}`}>{item.locationCode}</TableCell>
         <TableCell className={`text-gray-400 dark:text-neutral-500 ${wrapCls(columnSizing, "note")}`}>{item.note}</TableCell>
         <TableCell className={`pr-4 ${actionsCellCls(false)}`} onClick={(e) => e.stopPropagation()}>
@@ -952,6 +1091,72 @@ const BodyRow = memo(function BodyRow({
               <Pencil className="h-4 w-4" />
             </button>
             <button type="button" title={t("actions.issue")} onClick={() => onIssueGroup(item)} className={ROW_ACTION_CLS}>
+              <PackageMinus className="h-4 w-4" />
+            </button>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  if (row.kind === "pendingChild") {
+    const item = row.item;
+    const pendingActionRow = { kind: "pending", id: `${item.itemNo}-pending`, itemNo: item.itemNo, itemName: item.itemName, quantity: item.pendingQuantity, note: item.note };
+    return (
+      <TableRow className="group">
+        <TableCell className="relative w-8 pl-8">
+          <span className="absolute inset-y-0 left-8 flex w-3.5 justify-center">
+            <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
+          </span>
+        </TableCell>
+        <TableCell />
+        <TableCell className={`pl-6 text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "itemNo")}`}>{t("pending.unitLabel")}</TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "itemName")}`}>
+          <span className={nameCls(columnSizing)}>{item.itemName}</span>
+        </TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "quantity")}`}>{item.pendingQuantity}</TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "location")}`}>{item.locationCode}</TableCell>
+        <TableCell className={`text-gray-400 dark:text-neutral-500 ${wrapCls(columnSizing, "note")}`}>{item.note}</TableCell>
+        <TableCell className={`pr-4 ${actionsCellCls(false)}`}>
+          <div className="flex items-center justify-end gap-1">
+            <button type="button" title={t("actions.edit")} onClick={() => onEdit(pendingActionRow)} className={ROW_ACTION_CLS}>
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button type="button" title={t("actions.assign")} onClick={() => onAssignUnits(item)} className={ROW_ACTION_CLS}>
+              <Tags className="h-4 w-4" />
+            </button>
+            <button type="button" title={t("actions.issue")} onClick={() => onIssue(pendingActionRow)} className={ROW_ACTION_CLS}>
+              <PackageMinus className="h-4 w-4" />
+            </button>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  if (row.kind === "pendingRow") {
+    const item = row.item;
+    const pendingActionRow = { kind: "pending", id: `${item.itemNo}-pending`, itemNo: item.itemNo, itemName: item.itemName, quantity: item.pendingQuantity, note: item.note };
+    return (
+      <TableRow className="group">
+        <TableCell className="pl-8" />
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "itemNo")}`}>{item.itemNo}</TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "itemName")}`}>
+          <span className={nameCls(columnSizing)}>{item.itemName}</span>
+        </TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "materialNumber")}`}>{t("pending.unitLabel")}</TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "quantity")}`}>{item.pendingQuantity}</TableCell>
+        <TableCell className={`text-gray-600 dark:text-neutral-300 ${wrapCls(columnSizing, "location")}`}>{item.locationCode}</TableCell>
+        <TableCell className={`text-gray-400 dark:text-neutral-500 ${wrapCls(columnSizing, "note")}`}>{item.note}</TableCell>
+        <TableCell className={`pr-4 ${actionsCellCls(false)}`}>
+          <div className="flex items-center justify-end gap-1">
+            <button type="button" title={t("actions.edit")} onClick={() => onEdit(pendingActionRow)} className={ROW_ACTION_CLS}>
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button type="button" title={t("actions.assign")} onClick={() => onAssignUnits(item)} className={ROW_ACTION_CLS}>
+              <Tags className="h-4 w-4" />
+            </button>
+            <button type="button" title={t("actions.issue")} onClick={() => onIssue(pendingActionRow)} className={ROW_ACTION_CLS}>
               <PackageMinus className="h-4 w-4" />
             </button>
           </div>
@@ -1030,6 +1235,7 @@ export default function SmMaterialsPanel() {
   const [editingRow, setEditingRow] = useState(null);
   const [issuingRow, setIssuingRow] = useState(null);
   const [issuingGroup, setIssuingGroup] = useState(null);
+  const [assigningItem, setAssigningItem] = useState(null);
   const [bulkIssueOpen, setBulkIssueOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const { toasts, pushToast, dismissToast } = useToastStack();
@@ -1040,6 +1246,11 @@ export default function SmMaterialsPanel() {
   // Operation log feeding /materials-list-sm/history-sm (SmMaterialsHistoryTable
   // reads the same key) - see logOperation below for what gets written.
   const [, setOperationHistory] = useLocalStorage(SM_HISTORY_STORAGE_KEY, SM_HISTORY_SEED);
+  // Read-only here - Katalog materiałów SM (/materials-list-sm/catalog-sm,
+  // SmMaterialsCatalogTable) owns writing to this key; this page only
+  // reads it, to autofill a material's name in ReceiveUnitPanel (see
+  // handleItemNoBlur).
+  const [catalog] = useLocalStorage(SM_CATALOG_STORAGE_KEY, SM_CATALOG_SEED);
   const [operator, setOperator] = useState("");
 
   useEffect(() => {
@@ -1247,16 +1458,22 @@ export default function SmMaterialsPanel() {
         list.push({ kind: "aggregate", key: item.itemNo, item });
         return;
       }
+      const pending = hasPendingQuantity(item);
       if (viewMode === "flat") {
+        if (pending) list.push({ kind: "pendingRow", key: `${item.itemNo}-pending`, item });
         item.units.forEach((u) => list.push({ kind: "flatUnit", key: u.id, item, unit: u }));
         return;
       }
-      if (item.units.length === 1) {
+      // A pending remainder always makes the item expandable (even with
+      // 0 or 1 real units so far) so there's somewhere for its "Przypisz
+      // numery szpul" row to live - see AssignSpoolNumbersPanel.
+      if (item.units.length === 1 && !pending) {
         list.push({ kind: "singleUnit", key: item.itemNo, item, unit: item.units[0] });
         return;
       }
       list.push({ kind: "groupParent", key: item.itemNo, item });
       if (expandedItems[item.itemNo]) {
+        if (pending) list.push({ kind: "pendingChild", key: `${item.itemNo}-pending`, item });
         item.units.forEach((u) => list.push({ kind: "groupChild", key: u.id, item, unit: u }));
       }
     });
@@ -1312,19 +1529,79 @@ export default function SmMaterialsPanel() {
     pushToast(t("toast.received", { itemName: unit.itemName, quantity: unit.quantity }));
   }
 
-  // Same as handleCreate, batched - the bulk-receipt grid's "Zapisz" adds
-  // every valid row at once instead of one at a time.
-  function handleCreateBulk(units) {
-    setItems((prev) => units.reduce((acc, unit) => receiveUnit(acc, unit), prev));
+  // "Przyjęcie zamówienia" (order receipt) - the real order list this
+  // mirrors (see AGENTS.md) never carries spool numbers, only item +
+  // summed quantity, so this doesn't create a numbered unit like
+  // handleCreate/receiveUnit above. It adds to (or creates) the item's
+  // pendingQuantity instead - real stock, already on hand, waiting for
+  // spool numbers once the physical units are labeled (see
+  // handleAssignUnits/AssignSpoolNumbersPanel). An item that doesn't
+  // exist yet is created as trackedIndividually with an empty units
+  // array, since order-received items are always meant to end up
+  // per-spool tracked.
+  function receivePendingQuantity(itemsArr, entry) {
+    const idx = itemsArr.findIndex((it) => it.itemNo === entry.itemNo);
+    if (idx === -1) {
+      return [
+        { itemNo: entry.itemNo, itemName: entry.itemName, locationCode: entry.locationCode, note: "-", trackedIndividually: true, units: [], pendingQuantity: entry.quantity },
+        ...itemsArr,
+      ];
+    }
+    const next = [...itemsArr];
+    const existing = next[idx];
+    const total = (parseFloat(existing.pendingQuantity) || 0) + (parseFloat(entry.quantity) || 0);
+    next[idx] = { ...existing, pendingQuantity: total % 1 === 0 ? String(total) : total.toFixed(3) };
+    return next;
+  }
+
+  function handleReceiveOrder(entries) {
+    setItems((prev) => entries.reduce((acc, entry) => receivePendingQuantity(acc, entry), prev));
     setExpandedItems((prev) => {
       const next = { ...prev };
-      units.forEach((unit) => {
-        next[unit.itemNo] = true;
+      entries.forEach((entry) => {
+        next[entry.itemNo] = true;
       });
       return next;
     });
-    logOperation(units.map(historyEntryForReceipt));
-    pushToast(t("toast.receivedBulk", { count: units.length }));
+    logOperation(
+      entries.map((entry) => ({ operation: "receipt", itemNo: entry.itemNo, itemName: entry.itemName, unitId: "", quantity: entry.quantity, location: entry.locationCode }))
+    );
+    pushToast(t("toast.receivedBulk", { count: entries.length }));
+  }
+
+  // Second half of the order workflow: converts part (or all) of an
+  // item's pendingQuantity into real numbered units once the physical
+  // spools are labeled. Does NOT add new stock - that quantity was
+  // already counted by handleReceiveOrder - so it's logged as its own
+  // "labeling" operation kind, not another "receipt" (see
+  // AssignSpoolNumbersPanel and lib/smOperationHistory.js).
+  function handleAssignUnits(item, draftRows) {
+    const newUnits = draftRows.map((row) => ({
+      id: `u-${Date.now()}-${row.id}`,
+      unitType: "spool",
+      unitId: row.unitId,
+      productBatch: "",
+      quantity: row.quantity,
+      note: "-",
+      cipStatus: "match",
+    }));
+    const assignedTotal = draftRows.reduce((sum, row) => sum + (parseFloat(row.quantity) || 0), 0);
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.itemNo !== item.itemNo) return it;
+        const remaining = (parseFloat(it.pendingQuantity) || 0) - assignedTotal;
+        return {
+          ...it,
+          units: [...it.units, ...newUnits],
+          pendingQuantity: remaining > 0 ? (remaining % 1 === 0 ? String(remaining) : remaining.toFixed(3)) : undefined,
+        };
+      })
+    );
+    setExpandedItems((prev) => ({ ...prev, [item.itemNo]: true }));
+    logOperation(
+      newUnits.map((u) => ({ operation: "labeling", itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: u.quantity, location: item.locationCode }))
+    );
+    pushToast(t("toast.unitsAssigned", { count: newUnits.length, itemName: item.itemName }));
   }
 
   function handleSave(row, patch) {
@@ -1337,6 +1614,9 @@ export default function SmMaterialsPanel() {
         if (row.kind === "item") {
           return { ...it, itemName: patch.itemName, note: patch.note };
         }
+        if (row.kind === "pending") {
+          return { ...it, itemName: patch.itemName, pendingQuantity: patch.quantity, note: patch.note };
+        }
         return {
           ...it,
           itemName: patch.itemName ?? it.itemName,
@@ -1347,40 +1627,56 @@ export default function SmMaterialsPanel() {
   }
 
   // Pure reducer step shared by every issue path (single row, group
-  // checklist, cross-item bulk): issuing everything that's left behaves
-  // like before (the item/unit disappears); issuing less than what's
-  // available just shrinks the remaining amount instead - for an
-  // aggregate's total, and (bulk-issue only, where the quantity input is
-  // editable for units too) for a single unit's own length/weight.
+  // checklist, cross-item bulk): issuing less than what's available shrinks
+  // the remaining amount; issuing everything clamps it to 0 rather than
+  // removing the item - a material stays on the list (at 0) instead of
+  // vanishing the moment its last unit/quantity is issued away, so it's
+  // never mistaken for "never existed" rather than "fully issued".
   function issueRow(itemsArr, row, quantity) {
     if (row.kind === "aggregate") {
-      return itemsArr.flatMap((it) => {
-        if (it.itemNo !== row.itemNo) return [it];
+      return itemsArr.map((it) => {
+        if (it.itemNo !== row.itemNo) return it;
         const available = parseFloat(it.totalQuantity);
         const issued = quantity !== undefined ? parseFloat(quantity) : available;
-        if (issued >= available) return [];
-        const remaining = available - issued;
+        const remaining = Math.max(available - issued, 0);
         const formatted = remaining % 1 === 0 ? String(remaining) : remaining.toFixed(3);
-        return [{ ...it, totalQuantity: formatted }];
+        return { ...it, totalQuantity: formatted };
       });
     }
-    return itemsArr
-      .map((it) => {
+    // A "Brak" row - stock already on hand but not yet split into numbered
+    // spools (see receivePendingQuantity) - can be issued directly, same as
+    // an aggregate's total. Issuing everything clears pendingQuantity (the
+    // "Brak" row itself disappears, since there's nothing left unassigned)
+    // but - like every other branch here - never removes the item.
+    if (row.kind === "pending") {
+      return itemsArr.map((it) => {
         if (it.itemNo !== row.itemNo) return it;
-        return {
-          ...it,
-          units: it.units.flatMap((u) => {
-            if (u.id !== row.id) return [u];
-            const available = parseFloat(u.quantity);
-            const issued = quantity !== undefined ? parseFloat(quantity) : available;
-            if (issued >= available) return [];
-            const remaining = available - issued;
-            const formatted = remaining % 1 === 0 ? String(remaining) : remaining.toFixed(3);
-            return [{ ...u, quantity: formatted }];
-          }),
-        };
-      })
-      .filter((it) => (it.trackedIndividually ? it.units.length > 0 : true));
+        const available = parseFloat(it.pendingQuantity) || 0;
+        const issued = quantity !== undefined ? parseFloat(quantity) : available;
+        const remaining = Math.max(available - issued, 0);
+        if (remaining <= 0) {
+          const { pendingQuantity, ...rest } = it;
+          return rest;
+        }
+        const formatted = remaining % 1 === 0 ? String(remaining) : remaining.toFixed(3);
+        return { ...it, pendingQuantity: formatted };
+      });
+    }
+    return itemsArr.map((it) => {
+      if (it.itemNo !== row.itemNo) return it;
+      return {
+        ...it,
+        units: it.units.flatMap((u) => {
+          if (u.id !== row.id) return [u];
+          const available = parseFloat(u.quantity);
+          const issued = quantity !== undefined ? parseFloat(quantity) : available;
+          if (issued >= available) return [];
+          const remaining = available - issued;
+          const formatted = remaining % 1 === 0 ? String(remaining) : remaining.toFixed(3);
+          return [{ ...u, quantity: formatted }];
+        }),
+      };
+    });
   }
 
   function handleIssue(row, quantity) {
@@ -1388,6 +1684,19 @@ export default function SmMaterialsPanel() {
     setItems((prev) => issueRow(prev, row, quantity));
     logOperation([{ operation: "issue", itemNo: row.itemNo, itemName: row.itemName, unitId: row.unitId, quantity: quantity ?? row.quantity, location: item?.locationCode }]);
     pushToast(t("toast.issued", { itemName: row.itemName, quantity: quantity ?? row.quantity }));
+  }
+
+  // Manual cleanup for a material that's sitting at 0 (see issueRow's
+  // "never remove the item" policy) - not an inventory transaction, so
+  // this doesn't go through logOperation like the other handlers here.
+  // Called from EditUnitPanel's own Delete button; returns whether it
+  // actually went through, so the panel only closes on a real deletion
+  // and stays open if the confirm prompt was cancelled.
+  function handleDeleteItem(item) {
+    if (!window.confirm(t("actions.confirmDeleteZero", { itemName: item.itemName }))) return false;
+    setItems((prev) => prev.filter((it) => it.itemNo !== item.itemNo));
+    pushToast(t("toast.deleted", { itemName: item.itemName }));
+    return true;
   }
 
   // Same as handleIssue, batched - the group row's own "Wydaj" picks any
@@ -1424,11 +1733,12 @@ export default function SmMaterialsPanel() {
     setExporting(true);
     try {
       const headers = [t("columns.itemNo"), t("columns.itemName"), t("columns.unitId"), t("columns.quantity"), t("columns.location"), t("columns.note")];
-      const rows = filteredItems.flatMap((it) =>
-        it.trackedIndividually
-          ? it.units.map((u) => [it.itemNo, it.itemName, u.unitId, u.quantity, it.locationCode, it.note])
-          : [[it.itemNo, it.itemName, "-", it.totalQuantity, it.locationCode, it.note]]
-      );
+      const rows = filteredItems.flatMap((it) => {
+        if (!it.trackedIndividually) return [[it.itemNo, it.itemName, "-", it.totalQuantity, it.locationCode, it.note]];
+        const unitRows = it.units.map((u) => [it.itemNo, it.itemName, u.unitId, u.quantity, it.locationCode, it.note]);
+        const pendingRow = hasPendingQuantity(it) ? [[it.itemNo, it.itemName, t("pending.unitLabel"), it.pendingQuantity, it.locationCode, it.note]] : [];
+        return [...unitRows, ...pendingRow];
+      });
       const stamp = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
       await downloadStockXlsx({ fileName: `materialy_sm_${stamp}.xlsx`, sheets: [{ sheetName: "Materiały SM", headers, rows }] });
     } finally {
@@ -1711,7 +2021,8 @@ export default function SmMaterialsPanel() {
           <TableBody>
             {bodyRows.map((row) => {
               const isGroupParent = row.kind === "groupParent";
-              const selectionId = isGroupParent ? null : row.kind === "aggregate" ? row.item.itemNo : row.unit.id;
+              const hasNoSelection = isGroupParent || row.kind === "pendingChild" || row.kind === "pendingRow";
+              const selectionId = hasNoSelection ? null : row.kind === "aggregate" ? row.item.itemNo : row.unit.id;
               return (
                 <BodyRow
                   key={row.key}
@@ -1729,6 +2040,7 @@ export default function SmMaterialsPanel() {
                   onEdit={setEditingRow}
                   onIssue={setIssuingRow}
                   onIssueGroup={setIssuingGroup}
+                  onAssignUnits={setAssigningItem}
                 />
               );
             })}
@@ -1746,17 +2058,32 @@ export default function SmMaterialsPanel() {
         open={receiveOpen}
         onOpenChange={setReceiveOpen}
         onCreate={handleCreate}
-        onCreateBulk={handleCreateBulk}
+        onReceiveOrder={handleReceiveOrder}
         items={items}
+        catalog={catalog}
         t={t}
       />
-      <EditUnitPanel row={editingRow} open={Boolean(editingRow)} onOpenChange={(open) => !open && setEditingRow(null)} onSave={handleSave} t={t} />
+      <EditUnitPanel
+        row={editingRow}
+        open={Boolean(editingRow)}
+        onOpenChange={(open) => !open && setEditingRow(null)}
+        onSave={handleSave}
+        onDelete={handleDeleteItem}
+        t={t}
+      />
       <IssueUnitPanel row={issuingRow} open={Boolean(issuingRow)} onOpenChange={(open) => !open && setIssuingRow(null)} onIssue={handleIssue} t={t} />
       <IssueGroupPanel
         item={issuingGroup}
         open={Boolean(issuingGroup)}
         onOpenChange={(open) => !open && setIssuingGroup(null)}
         onIssue={handleIssueUnits}
+        t={t}
+      />
+      <AssignSpoolNumbersPanel
+        item={assigningItem}
+        open={Boolean(assigningItem)}
+        onOpenChange={(open) => !open && setAssigningItem(null)}
+        onAssign={handleAssignUnits}
         t={t}
       />
       <BulkIssuePanel

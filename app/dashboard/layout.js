@@ -29,6 +29,7 @@ const RECENT_PAGES_KEY = "wms-recent-pages";
 const STOCK_BASE_PATH = "/dashboard/stock";
 const MATERIALS_BASE_PATH = "/dashboard/materials-list-cip";
 const MATERIALS_SM_BASE_PATH = "/dashboard/materials-list-sm";
+const ORDERS_CIP_BASE_PATH = "/dashboard/orders/cip";
 const ORDERS_WMS_BASE_PATH = "/dashboard/orders/wms";
 const MAX_RECENT_PAGES = 5;
 export default function DashboardLayout({ children }) {
@@ -44,6 +45,7 @@ export default function DashboardLayout({ children }) {
   const [materialsSmOpen, setMaterialsSmOpen] = useState(() =>
     pathname.startsWith(MATERIALS_SM_BASE_PATH)
   );
+  const [ordersCipOpen, setOrdersCipOpen] = useState(() => pathname.startsWith(ORDERS_CIP_BASE_PATH));
   const [ordersWmsOpen, setOrdersWmsOpen] = useState(() => pathname.startsWith(ORDERS_WMS_BASE_PATH));
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
@@ -107,6 +109,13 @@ export default function DashboardLayout({ children }) {
   const materialsSmChildren = [
     { href: "/dashboard/materials-list-sm", label: tNav("materialsListSm") },
     { href: "/dashboard/materials-list-sm/history-sm", label: tNav("materialsHistorySm") },
+    { href: "/dashboard/materials-list-sm/catalog-sm", label: tNav("materialsCatalogSm") },
+  ];
+
+  const ordersCipChildren = [
+    { href: "/dashboard/orders/cip", label: tNav("ordersCipList") },
+    { href: "/dashboard/orders/cip/history", label: tNav("ordersCipHistory") },
+    { href: "/dashboard/orders/cip/reports", label: tNav("reports") },
   ];
 
   const ordersWmsChildren = [{ href: "/dashboard/orders/wms", label: tNav("ordersWmsLists") }];
@@ -192,14 +201,16 @@ export default function DashboardLayout({ children }) {
               items={materialsSmChildren}
             />
 
-            <Link
-              href="/dashboard/orders/cip"
-              title={collapsed ? tNav("ordersCip") : undefined}
-              className={navLinkClasses(pathname === "/dashboard/orders/cip", collapsed)}
-            >
-              <ShoppingCart className="h-5 w-5 shrink-0" />
-              {!collapsed && tNav("ordersCip")}
-            </Link>
+            <NavGroup
+              icon={ShoppingCart}
+              label={tNav("ordersCip")}
+              basePath={ORDERS_CIP_BASE_PATH}
+              pathname={pathname}
+              collapsed={collapsed}
+              open={ordersCipOpen}
+              onToggle={() => setOrdersCipOpen((prev) => !prev)}
+              items={ordersCipChildren}
+            />
 
             <NavGroup
               icon={PackageMinus}

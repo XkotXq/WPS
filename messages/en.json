@@ -26,7 +26,10 @@
     "materialsSm": "SM Materials",
     "materialsListSm": "SM Materials List",
     "materialsHistorySm": "SM Operation History",
-    "ordersCip": "CIP Orders",
+    "materialsCatalogSm": "SM Materials Catalog",
+    "ordersCip": "Orders",
+    "ordersCipList": "Order list",
+    "ordersCipHistory": "Order history",
     "ordersWms": "WMS Issues",
     "ordersWmsLists": "Issue lists",
     "search": "Search",
@@ -103,6 +106,8 @@
       "delta": "Δ (km)",
       "materialsItemNo": "Item no.",
       "materialsItemName": "Name",
+      "materialsIndividualUnits": "Separate units",
+      "materialsUnitType": "Unit form",
       "materialsSpec": "Specification",
       "materialsLocation": "Location",
       "materialsCreateTime": "Created at",
@@ -267,8 +272,31 @@
     "subtitle": "Materials reports will be shown here. This section is coming soon."
   },
   "ordersCip": {
-    "title": "CIP Orders",
-    "subtitle": "CIP orders will be shown here. This section is coming soon."
+    "title": "Order list",
+    "subtitle": "Orders placed to the main warehouse. Demo data - CIP integration is coming soon.",
+    "count": "Items: {count}",
+    "columns": {
+      "orderNo": "Order number",
+      "status": "Status",
+      "line": "Line",
+      "employeeNo": "Employee no.",
+      "createdAt": "Created at",
+      "note": "Note"
+    },
+    "status": {
+      "new": "New",
+      "inProgress": "In progress",
+      "done": "Completed",
+      "cancelled": "Cancelled"
+    }
+  },
+  "ordersCipHistory": {
+    "title": "Order history",
+    "subtitle": "Completed order history will be shown here. This section is coming soon."
+  },
+  "ordersCipReports": {
+    "title": "Reports",
+    "subtitle": "Order reports will be shown here. This section is coming soon."
   },
   "ordersWms": {
     "title": "WMS Issues",
@@ -309,7 +337,25 @@
     },
     "actions": {
       "edit": "Edit",
-      "issue": "Issue"
+      "issue": "Issue",
+      "assign": "Assign unit numbers",
+      "confirmDeleteZero": "Delete {itemName} from the list? Its quantity is 0."
+    },
+    "pending": {
+      "unitLabel": "Missing"
+    },
+    "assignPanel": {
+      "title": "Assign unit numbers",
+      "unitIdLabel": "Unit number",
+      "quantityLabel": "Quantity",
+      "remainingLabel": "Remaining to assign",
+      "overAssigned": "Assigned {quantity} more than ordered.",
+      "exceedsRemaining": "Quantity exceeds what's left to assign ({remaining}).",
+      "addRow": "Add",
+      "removeRow": "Remove",
+      "empty": "Add at least one unit.",
+      "save": "Save",
+      "cancel": "Cancel"
     },
     "receivePanel": {
       "title": "Material receipt",
@@ -319,18 +365,18 @@
       "locationLabel": "Location",
       "unitIdLabel": "Unit number",
       "modeSingle": "Single receipt",
-      "modeBulk": "Bulk receipt",
+      "modeBulk": "Order receipt",
       "addRow": "+ Add row",
       "removeSelected": "Remove selected ({count})",
-      "import": "Import",
-      "importError": "Couldn't read the file. Check the format and try again.",
+      "incompleteRows": "Fill in quantity and location for every started row.",
       "save": "Save",
       "cancel": "Cancel"
     },
     "editPanel": {
       "title": "Edit",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "delete": "Delete"
     },
     "issuePanel": {
       "title": "Issue unit",
@@ -353,9 +399,11 @@
     "toast": {
       "received": "Received {itemName} ({quantity}).",
       "receivedBulk": "Received {count} items.",
+      "unitsAssigned": "Assigned {count} units to {itemName}.",
       "issued": "Issued {itemName} ({quantity}).",
       "issuedUnits": "Issued {count} units of {itemName}.",
-      "issuedBulk": "Issued {count} items."
+      "issuedBulk": "Issued {count} items.",
+      "deleted": "Removed {itemName} from the list."
     },
     "notePanel": {
       "noteLabel": "Note",
@@ -368,7 +416,34 @@
     "count": "Items: {count}",
     "operationIn": "Receipt",
     "operationOut": "Issue",
+    "operationLabeling": "Labeling",
     "empty": "No operations recorded yet. Receipts and issues from SM Materials will show up here."
+  },
+  "materialsCatalogSm": {
+    "title": "SM Materials Catalog",
+    "subtitle": "Reference list of SM materials - item number and name, used to suggest a name during receipts. Add a new material here before receiving it.",
+    "count": "Items: {count}",
+    "actions": {
+      "add": "Add material",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "confirmDelete": "Delete {itemNo} from the catalog?"
+    },
+    "form": {
+      "itemNo": "Item number",
+      "itemName": "Name",
+      "individualUnitsLabel": "Material split into units",
+      "individualUnitsHint": "Check this if this material's quantities should be split into separate, numbered objects (e.g. spools) instead of being summed into one combined value.",
+      "unitTypeLabel": "Unit form",
+      "cancel": "Cancel",
+      "required": "Enter an item number and name.",
+      "duplicate": "This item number is already in the catalog."
+    },
+    "unitTypeSpool": "Spool",
+    "unitTypeBigbag": "Bigbag",
+    "unitTypeThread": "Thread",
+    "unitTypeOther": "Other"
   },
   "materialsHistory": {
     "title": "Operation History",
