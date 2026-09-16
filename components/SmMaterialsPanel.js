@@ -1396,7 +1396,7 @@ export default function SmMaterialsPanel() {
   const [trendItem, setTrendItem] = useState(null);
   const [bulkIssueOpen, setBulkIssueOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const { toasts, pushToast, dismissToast } = useToastStack();
+  const { toasts, pushToast, dismissToast, pauseToast, resumeToast } = useToastStack();
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [expandedItems, setExpandedItems] = useState({});
   const [viewMode, setViewMode] = useState("grouped");
@@ -1794,7 +1794,10 @@ export default function SmMaterialsPanel() {
     logOperation(
       entries.map((entry) => ({ operation: "receipt", itemNo: entry.itemNo, itemName: entry.itemName, unitId: "", quantity: entry.quantity, location: entry.locationCode }))
     );
-    pushToast(t("toast.receivedBulk", { count: entries.length }));
+    pushToast(
+      t("toast.receivedBulk", { count: entries.length }),
+      entries.map((entry) => `${entry.itemName} (${entry.quantity})`)
+    );
   }
 
   // Second half of the order workflow: converts part (or all) of an
@@ -1829,7 +1832,10 @@ export default function SmMaterialsPanel() {
     logOperation(
       newUnits.map((u) => ({ operation: "labeling", itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: u.quantity, location: item.locationCode }))
     );
-    pushToast(t("toast.unitsAssigned", { count: newUnits.length, itemName: item.itemName }));
+    pushToast(
+      t("toast.unitsAssigned", { count: newUnits.length, itemName: item.itemName }),
+      newUnits.map((u) => `${u.unitId} (${u.quantity})`)
+    );
   }
 
   function handleSave(row, patch) {
@@ -1940,7 +1946,13 @@ export default function SmMaterialsPanel() {
         return { operation: "issue", itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: quantity ?? u.quantity, location: item.locationCode };
       })
     );
-    pushToast(t("toast.issuedUnits", { count: entries.length, itemName: item.itemName }));
+    pushToast(
+      t("toast.issuedUnits", { count: entries.length, itemName: item.itemName }),
+      entries.map(({ id, quantity }) => {
+        const u = item.units.find((unit) => unit.id === id);
+        return `${u.unitId} (${quantity ?? u.quantity})`;
+      })
+    );
   }
 
   // Cross-item bulk issue - each selected leaf row (unit or whole
@@ -1954,7 +1966,10 @@ export default function SmMaterialsPanel() {
       })
     );
     setSelectedIds(new Set());
-    pushToast(t("toast.issuedBulk", { count: entries.length }));
+    pushToast(
+      t("toast.issuedBulk", { count: entries.length }),
+      entries.map(({ row, quantity }) => `${row.itemName}${row.unitId ? ` (${row.unitId})` : ""} - ${quantity ?? row.quantity}`)
+    );
   }
 
   async function handleExport() {
@@ -2356,7 +2371,7 @@ export default function SmMaterialsPanel() {
         onIssue={handleBulkIssue}
         t={t}
       />
-      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <ToastStack toasts={toasts} onDismiss={dismissToast} onPause={pauseToast} onResume={resumeToast} />
     </div>
   );
 }
