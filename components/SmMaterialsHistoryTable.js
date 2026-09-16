@@ -26,6 +26,19 @@ function OperationLabel({ operation }) {
   return <span className="text-gray-700 dark:text-neutral-200">{t(OPERATION_LABEL_KEYS[operation] ?? "operationIn")}</span>;
 }
 
+// No more standalone "Numer jednostki" column - for an FRP entry (the only
+// operation.unitId isn't blank/"-" for) the spool number now rides next to
+// the item name instead, same inline treatment as a groupChild row in
+// SmMaterialsPanel's own table.
+function ItemNameCell({ itemName, unitId }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span>{itemName}</span>
+      {unitId && unitId !== "-" && <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-neutral-500">{unitId}</span>}
+    </span>
+  );
+}
+
 // "YYYY-MM-DD HH:mm:ss" in local time - same shape as CIP's own
 // handleTimeAfter/createTime strings, so this column reads consistently
 // with Historia operacji CIP even though the underlying data isn't CIP.
@@ -44,8 +57,14 @@ function formatTime(iso) {
 // per-unit concept to begin with (that's the whole point of Materiały SM).
 const COLUMNS = [
   { key: "itemNo", headerKey: "historyItemNo", filterFn: "includesString", sortable: true },
-  { key: "itemName", headerKey: "historyItemName", filterFn: "includesString", sortable: true, className: "max-w-[220px] truncate" },
-  { key: "unitId", headerKey: "historyUnitId", filterFn: "includesString", sortable: true },
+  {
+    key: "itemName",
+    headerKey: "historyItemName",
+    filterFn: "includesString",
+    sortable: true,
+    className: "max-w-[220px] truncate",
+    render: (row) => <ItemNameCell itemName={row.itemName} unitId={row.unitId} />,
+  },
   { key: "operation", headerKey: "historyOperation", filterFn: "multiselect", render: (row) => <OperationLabel operation={row.operation} /> },
   { key: "quantity", headerKey: "historyQuantity", filterFn: "inNumberRange", sortable: true },
   { key: "location", headerKey: "historyLocation", filterFn: "multiselect", sortable: true },

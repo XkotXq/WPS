@@ -118,7 +118,6 @@
       "historyLocation": "Lokalizacja",
       "historyOperator": "Wykonał",
       "historyTime": "Data i godzina",
-      "historyUnitId": "Numer jednostki",
       "status": "Status",
       "yes": "Tak",
       "no": "Nie"
@@ -307,6 +306,11 @@
     "fetchError": "Nie udało się pobrać listy z API.",
     "empty": "Brak materiałów. Użyj przycisku „Przyjęcie”, aby dodać pierwszy.",
     "addReceipt": "Przyjęcie",
+    "refresh": "Odśwież",
+    "dataAsOf": "Dane z {time}",
+    "prevPage": "Poprzednia",
+    "nextPage": "Następna",
+    "pageOf": "Strona {current} z {total}",
     "viewMode": {
       "grouped": "Pogrupowane",
       "flat": "Lista"
@@ -379,7 +383,6 @@
       "modeBulk": "Przyjęcie zamówienia",
       "addRow": "+ Dodaj wiersz",
       "removeSelected": "Usuń zaznaczone ({count})",
-      "incompleteRows": "Uzupełnij ilość i lokalizację w każdym rozpoczętym wierszu.",
       "save": "Zapisz",
       "cancel": "Anuluj"
     },
@@ -400,6 +403,10 @@
     "bulkIssuePanel": {
       "trigger": "Wydaj zaznaczone ({count})",
       "title": "Wydaj zaznaczone materiały",
+      "setFull": "Ustaw całość dla danego materiału",
+      "setLastReceipt": "Ustaw ilość z ostatniego przyjęcia",
+      "setSameQuantity": "Ustaw jedną liczbę dla wszystkich itemów:",
+      "applyQuantity": "Zastosuj",
       "confirm": "Wydaj ({count})"
     },
     "issueGroupPanel": {

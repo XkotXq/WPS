@@ -118,7 +118,6 @@
       "historyLocation": "Location",
       "historyOperator": "Handled by",
       "historyTime": "Date & time",
-      "historyUnitId": "Unit number",
       "status": "Status",
       "yes": "Yes",
       "no": "No"
@@ -307,6 +306,11 @@
     "fetchError": "Failed to fetch the list from the API.",
     "empty": "No materials yet. Use the \"Receipt\" button to add the first one.",
     "addReceipt": "Receipt",
+    "refresh": "Refresh",
+    "dataAsOf": "Data as of {time}",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "pageOf": "Page {current} of {total}",
     "viewMode": {
       "grouped": "Grouped",
       "flat": "List"
@@ -379,7 +383,6 @@
       "modeBulk": "Order receipt",
       "addRow": "+ Add row",
       "removeSelected": "Remove selected ({count})",
-      "incompleteRows": "Fill in quantity and location for every started row.",
       "save": "Save",
       "cancel": "Cancel"
     },
@@ -400,6 +403,10 @@
     "bulkIssuePanel": {
       "trigger": "Issue selected ({count})",
       "title": "Issue selected materials",
+      "setFull": "Set full amount for that material",
+      "setLastReceipt": "Set quantity from last receipt",
+      "setSameQuantity": "Set one number for all items:",
+      "applyQuantity": "Apply",
       "confirm": "Issue ({count})"
     },
     "issueGroupPanel": {

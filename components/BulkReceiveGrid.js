@@ -95,8 +95,15 @@ const smTextCellRenderer = {
     ctx.rect(rect.x, rect.y, rect.width, rect.height);
     ctx.clip();
     if (cell.data.invalid) {
+      // Inset by 1px so this fill never touches the cell's own border line -
+      // glide draws that border (a translucent gray, see its default
+      // borderColor) *after* this custom cell renders, so painting flush to
+      // the edge let the red show through the border itself, making it read
+      // as a red outline around the cell (most noticeable right where the
+      // cursor is, since that's where you're actually looking at the edge)
+      // rather than just an interior highlight.
       ctx.fillStyle = "rgba(220, 38, 38, 0.16)";
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+      ctx.fillRect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
     }
     ctx.fillStyle = theme.textDark;
     ctx.font = theme.baseFontFull;
@@ -239,10 +246,19 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, onLookupItem
       const rowData = rows[row];
       const value = rowData?.[field] ?? "";
       const isStarted = rowData && COLUMN_FIELDS.some((f) => rowData[f].trim());
-      const invalid = isStarted && (field === "quantity" || field === "location") && !value.trim();
-      return makeTextCell(value, invalid);
+      const missingRequired = isStarted && (field === "quantity" || field === "location") && !value.trim();
+      // A typed Nr itemu that doesn't resolve to any material already on
+      // hand or in Katalog materiałów SM (onLookupItemName - same lookup
+      // the autofill-on-blur uses) is flagged the same way a blank
+      // required field is - a made-up item number would otherwise save
+      // silently under whatever name was typed next to it (see
+      // validOrderEntries/incompleteBulkRows in SmMaterialsPanel.js, which
+      // actually block Zapisz for this row - this is just the visible cue
+      // for which one).
+      const unknownItemNo = isStarted && field === "itemNo" && value.trim() && onLookupItemName && !onLookupItemName(value);
+      return makeTextCell(value, missingRequired || unknownItemNo);
     },
-    [rows]
+    [rows, onLookupItemName]
   );
 
   // Excel-style "just start typing over a selected cell" - editOnType
