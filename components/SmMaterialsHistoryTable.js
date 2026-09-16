@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { useLocalStorage } from "usehooks-ts";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import MaterialsTable from "@/components/MaterialsTable";
 import FrpFilters from "@/components/FrpFilters";
-import { SM_HISTORY_SEED, SM_HISTORY_STORAGE_KEY } from "@/lib/smOperationHistory";
+import { smOperationsApi } from "@/lib/smItemsApi";
+
+// Server caps a single page at this many rows (see wpsapi's smOperations.js
+// HISTORY_LIMIT) - kept in sync here since the client decides the offset
+// for the next page.
+const PAGE_SIZE = 500;
 
 // Plain text, not a pill - unlike CipMaterialsHistoryTable's own
 // OperationBadge, which tags "InStorage"/"OutStorage" with a colored pill.
@@ -49,25 +55,64 @@ const COLUMNS = [
 
 export default function SmMaterialsHistoryTable() {
   const t = useTranslations("materialsHistorySm");
-  // Same storage key SmMaterialsPanel writes to via its own useLocalStorage
-  // call - usehooks-ts syncs both through a same-tab "local-storage" event,
-  // so a receipt/issue made on /materials-list-sm shows up here on
-  // navigation without needing any shared backend (see AGENTS.md: nothing
-  // in Materiały SM persists anywhere real yet).
-  const [history] = useLocalStorage(SM_HISTORY_STORAGE_KEY, SM_HISTORY_SEED);
+  // Backed by wpsapi's sm_operations (see lib/smItemsApi.js) - a receipt/
+  // issue made on /materials-list-sm (SmMaterialsPanel's logOperation)
+  // shows up here on the next load of this page, not live (this page
+  // only re-fetches on mount or on a page change, same "not live" rule as
+  // the rest of Materiały SM). `page` is 0-based state, not a URL param -
+  // unlike Historia operacji CIP's own pager, nothing else on this page
+  // reads from the URL.
+  const [history, setHistory] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
 
-  const data = useMemo(() => history.map((entry) => ({ ...entry, unitId: entry.unitId || "-", time: formatTime(entry.time) })), [history]);
+  useEffect(() => {
+    setLoading(true);
+    setLoadError(false);
+    smOperationsApi
+      .list(PAGE_SIZE, page * PAGE_SIZE)
+      .then(({ rows, total: totalCount }) => {
+        setHistory(rows);
+        setTotal(totalCount);
+      })
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
+  }, [page]);
 
-  if (history.length === 0) {
+  const data = useMemo(() => history.map((entry) => ({ ...entry, unitId: entry.unitId || "-", time: formatTime(entry.time) })), [history]);
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+
+  if (loading) {
+    return <p className="mt-6 text-sm text-gray-400 dark:text-neutral-500">{t("loading")}</p>;
+  }
+  if (loadError) {
+    return <p className="mt-6 text-sm text-red-600 dark:text-red-400">{t("fetchError")}</p>;
+  }
+  if (total === 0) {
     return <p className="mt-6 rounded-lg border border-dashed border-gray-200 dark:border-neutral-800 px-4 py-10 text-center text-sm text-gray-500 dark:text-neutral-400">{t("empty")}</p>;
   }
 
   return (
     <div>
-      <p className="mb-3 text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: data.length })}</p>
+      <p className="mb-3 text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: total })}</p>
       <FrpFilters onGlobalFilterChange={setSearch} />
       <MaterialsTable data={data} columns={COLUMNS} globalFilter={search} onGlobalFilterChange={setSearch} />
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <Button variant="outline" size="sm" disabled={page <= 0} onClick={() => setPage((p) => p - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+            {t("prevPage")}
+          </Button>
+          <span className="text-sm text-gray-500 dark:text-neutral-400">{t("pageOf", { current: page + 1, total: totalPages })}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+            {t("nextPage")}
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

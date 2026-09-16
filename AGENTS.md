@@ -115,29 +115,35 @@ same key" when rendering the "wg itemu" breakdown table's compare
 columns. The trend query itself is capped server-side at 150 rounds (see
 wpsApi's `getMaterialTrend`).
 
-## "Materiały SM" (Stock Manager) - the unit-tracking concept
+## "Materiały SM" (Stock Manager) - the unit-tracking layer
 `app/dashboard/materials-list-sm/` (component: `components/SmMaterialsPanel.js`)
-is a from-scratch concept page, separate from the real CIP-backed
+is a real, wpsapi-backed section, separate from the real CIP-backed
 "Materiały CIP" section (`materials-list-cip/`, `CipMaterialsTable.js`).
-The problem it explores: CIP only ever stores an item's aggregate
+The problem it solves: CIP only ever stores an item's aggregate
 quantity + location (e.g. "item 404, 48.800, MT") - it has no field for
 *which physical unit* that quantity is on, so a spool's own drum number
 or a single bigbag's individual weight has nowhere to live in CIP. This
-page demos layering that missing per-unit detail on top, entirely
-locally (its `INITIAL_ITEMS` mock state lives only in the component,
-sourced for realism from `stock`'s own `DEFAULT_FRP_DB` catalog):
+page layers that missing per-unit detail on top, backed by wpsapi's
+`sm_items`/`sm_units` tables (see `wpsapi/src/schema.sql`,
+`wpsapi/src/smItems.js`, `wps/lib/smItemsApi.js`):
 
 - **Data model**: each item is either `trackedIndividually: true` (has a
-  `units` array - one entry per spool/bigbag, each with its own `id`,
-  `unitType` ("spool"/"bigbag"), `unitId` e.g. "SZP-2231", `quantity`,
-  `note`) or `trackedIndividually: false` (a single combined
+  `units` array - one entry per spool, each with its own `id`,
+  `unitId` e.g. "SZP-2231", `quantity`, `note`, `productBatch`,
+  `cipStatus`) or `trackedIndividually: false` (a single combined
   `totalQuantity` - e.g. thread sold by weight, a CIP-style aggregate
-  with nothing to split into units).
+  with nothing to split into units). Only plain "FRP..." items are
+  `trackedIndividually` (not "Coated FRP...", not filler/"PP...") -
+  bigbags are always tracked in aggregate. This is decided by checking
+  current stock first (an existing item's own `trackedIndividually`),
+  then falling back to the catalog's `individualUnits` flag (`sm_catalog`'s
+  `individually_tracked` column - see `receivePendingQuantity`,
+  `resolveCatalogItemName`, `isIndividuallyTracked` in `SmMaterialsPanel.js`).
 - **Row "kind" discriminator**: edit/issue panels take a row shaped
   `{ kind: "unit" | "item" | "aggregate", ... }` and branch on it (see
   `EditUnitPanel`, `IssueUnitPanel`) instead of needing three separate
   panel components.
-- **Issuing**: a unit (spool/bigbag) is always issued in full - there's
+- **Issuing**: a unit (spool) is always issued in full - there's
   no partial concept for a single physical object. An aggregate material
   *can* be issued partially (a quantity input caps at what's left;
   issuing less than the total just shrinks it instead of removing the
@@ -147,11 +153,30 @@ sourced for realism from `stock`'s own `DEFAULT_FRP_DB` catalog):
   group row's own "Wydaj"), and `BulkIssuePanel` (cross-item - any mix of
   checkboxes across the table, opened from the toolbar's "Wydaj
   zaznaczone", rendered as a table so every value gets its own column).
-- **Nothing here persists anywhere real yet** - see the "note" copy in
-  each panel. The two-write idea the concept is built around: a real
-  implementation would push item/quantity/location to CIP through its
-  own write API and keep the unit id locally, since CIP has no field for
-  it.
+- **Persistence**: every reducer in this file stays a pure function
+  operating on the in-memory `items` array, unchanged - a wrapped
+  `setItems` (in `SmMaterialsPanel.js`) diffs `prev` vs `next` by object
+  reference (relying on the convention that unchanged items keep the
+  same reference) and PUTs/DELETEs only the item(s) that actually
+  changed against `/api/sm-items`, sending each item's full row + its
+  whole `units` array (the server replaces that item's units wholesale
+  on every upsert - see `upsertSmItem` in `wpsapi/src/smItems.js`).
+  The two-write idea this screen is still built around for CIP itself:
+  item/quantity/location live in CIP; the unit (spool) number has
+  nowhere to go there, so it's kept here instead - this page does not
+  write to CIP.
+- **Catalog name enforcement**: everywhere an operator types both an
+  item number and an item name (single receipt, bulk order-receipt
+  paste), the typed name is checked against `sm_catalog` and silently
+  replaced with the catalog's name on mismatch (`resolveCatalogItemName`)
+  before it's saved or logged - keeps `sm_items`/`sm_operations` from
+  accumulating operator typos/variants for the same item number.
+- **History**: every receive/issue/labeling action also calls
+  `logOperation`, which POSTs to `/api/sm-operations` (`wpsapi/src/smOperations.js`,
+  table `sm_operations`) - shown on `materials-list-sm/history-sm`
+  (`SmMaterialsHistoryTable.js`), which fetches that endpoint on mount.
+  Not live/real-time - a second browser tab needs a reload to see
+  another tab's changes, same as the rest of Materiały SM.
 - Every create/issue action on this page ends with a bottom-right toast
   (`components/ui/toast.jsx`'s `useToastStack`/`ToastStack`) confirming
   what happened - keep that call site pattern (`pushToast(t("toast.xxx", {...}))`

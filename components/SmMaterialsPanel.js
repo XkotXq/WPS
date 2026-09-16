@@ -2,8 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useLocalStorage } from "usehooks-ts";
-import { Plus, Pencil, PackageMinus, Search, Download, ChevronDown, ChevronRight, Layers, List, Filter, Package, Boxes, Tags, Trash2, X } from "lucide-react";
+import { Plus, Pencil, PackageMinus, Search, Download, ChevronDown, ChevronRight, Layers, List, Filter, Package, Boxes, Tags, Trash2, X, MoreVertical, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,19 +10,15 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ToastStack, useToastStack } from "@/components/ui/toast";
 import BulkReceiveGrid, { newBulkReceiveRow } from "@/components/BulkReceiveGrid";
+import SmMaterialStockChart from "@/components/SmMaterialStockChart";
 import { downloadStockXlsx } from "@/lib/xlsxExport";
-import { SM_INITIAL_ITEMS } from "@/lib/smMaterialsSeed";
 import { getCipSession } from "@/lib/cipSession";
-import { SM_HISTORY_LIMIT, SM_HISTORY_SEED, SM_HISTORY_STORAGE_KEY, makeSmHistoryId } from "@/lib/smOperationHistory";
-import { SM_CATALOG_SEED, SM_CATALOG_STORAGE_KEY } from "@/lib/smMaterialsCatalog";
+import { smCatalogApi } from "@/lib/smCatalogApi";
+import { smItemsApi, smOperationsApi } from "@/lib/smItemsApi";
 import { sanitizeQuantityInput } from "@/lib/quantityInput";
-
-// Mock "Materiały SM" seed data (moved to lib/smMaterialsSeed.js) - see
-// SM_INITIAL_ITEMS there for what this concept demonstrates and where the
-// data came from.
-const INITIAL_ITEMS = SM_INITIAL_ITEMS;
 
 // No unit suffix is stored (km/kg) - everyone already knows which unit a
 // given material uses, so quantities are plain numbers throughout.
@@ -48,6 +43,20 @@ function itemQuantityValue(item) {
 // order for an item that already has labeled spools from a previous one).
 function hasPendingQuantity(item) {
   return (parseFloat(item.pendingQuantity) || 0) > 0;
+}
+
+// Every place item number + name are typed together (ReceiveUnitPanel's
+// single form, BulkReceiveGrid's order rows) enforces this at submit
+// time: if the item number is a known sm_catalog entry, its real name
+// always wins over whatever was typed/left over from autofill, so a
+// receipt can never record an item under the wrong name by mistake
+// (stale autofill, a typo, a name copy-pasted from the wrong row). An
+// item number the catalog doesn't know keeps whatever name was typed -
+// there's nothing to correct it against.
+function resolveCatalogItemName(itemNo, typedName, catalog) {
+  const trimmed = itemNo.trim();
+  const match = catalog.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
+  return match ? match.itemName : typedName;
 }
 
 // Same "Ilość" total sumQuantity(item.units) would give, but also
@@ -128,11 +137,11 @@ function UnitInfo({ row, t }) {
   );
 }
 
-// Mock "add receipt" form - the two-write idea discussed for this screen:
-// on a real save this would (1) push item/quantity/location to CIP through
-// its API and (2) keep the unit number here, since CIP has nowhere to put
-// it. For now it only updates local state, to demo the flow.
-function ReceiveUnitPanel({ open, onOpenChange, onCreate, onReceiveOrder, items, catalog, t }) {
+// "Add receipt" form. The two-write idea this screen is still built
+// around: item/quantity/location live in CIP, the unit (spool) number
+// has nowhere to go there so it's kept here instead, in sm_items/sm_units
+// (see lib/smItemsApi.js) - CIP itself isn't written to from this page.
+function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateAggregate, onReceiveOrder, items, catalog, t }) {
   const [itemNo, setItemNo] = useState("");
   const [itemName, setItemName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -152,18 +161,55 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onReceiveOrder, items,
     setBulkRows([newBulkReceiveRow(), newBulkReceiveRow(), newBulkReceiveRow()]);
   }, [open]);
 
+  // Whether the currently-typed item number is individually tracked (only
+  // plain FRP is, see sm_catalog) - checked against current stock first
+  // (an item already on the shelf carries its own real trackedIndividually),
+  // then the reference catalog, same two sources and order as
+  // lookupItemName below. Drives whether the Numer szpuli field even
+  // makes sense to ask for: an aggregate material has no per-unit label.
+  // Unknown items (not in stock or the catalog) default to not tracked,
+  // matching sm_catalog's own column default.
+  function isIndividuallyTracked(rawItemNo) {
+    const trimmed = rawItemNo.trim();
+    if (!trimmed) return false;
+    const stockMatch = items.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
+    if (stockMatch) return Boolean(stockMatch.trackedIndividually);
+    const catalogMatch = catalog.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
+    return Boolean(catalogMatch?.individualUnits);
+  }
+  const needsSpoolId = isIndividuallyTracked(itemNo);
+
   function handleSubmit(e) {
     e.preventDefault();
-    if (!itemNo.trim() || !itemName.trim() || !quantity.trim() || !unitId.trim()) return;
-    onCreate({
-      id: `u-${Date.now()}`,
-      unitType: "spool",
-      itemNo: itemNo.trim(),
-      itemName: itemName.trim(),
-      unitId: unitId.trim(),
-      quantity: quantity.trim(),
-      locationCode: location.trim() || "MT",
-    });
+    if (!itemNo.trim() || !itemName.trim() || !quantity.trim()) return;
+    const resolvedName = resolveCatalogItemName(itemNo, itemName.trim(), catalog);
+    if (needsSpoolId && unitId.trim()) {
+      onCreate({
+        id: `u-${Date.now()}`,
+        unitType: "spool",
+        itemNo: itemNo.trim(),
+        itemName: resolvedName,
+        unitId: unitId.trim(),
+        quantity: quantity.trim(),
+        locationCode: location.trim() || "MT",
+      });
+    } else if (needsSpoolId) {
+      // No spool number yet - same rule as "Przyjęcie zamówienia" (bulk
+      // order receipt): the quantity is real, already-received stock, just
+      // not yet split into a labeled spool (the physical spool may not be
+      // labeled yet) - goes into pendingQuantity (the "Brak" row) instead
+      // of silently blocking the whole receipt on a number nobody has yet.
+      // A spool number gets attached later via "Przypisz numery jednostek"
+      // (AssignSpoolNumbersPanel), same as for the bulk path.
+      onReceiveOrder([{ itemNo: itemNo.trim(), itemName: resolvedName, quantity: quantity.trim(), locationCode: location.trim() || "MT" }]);
+    } else {
+      onCreateAggregate({
+        itemNo: itemNo.trim(),
+        itemName: resolvedName,
+        quantity: quantity.trim(),
+        locationCode: location.trim() || "MT",
+      });
+    }
     onOpenChange(false);
   }
 
@@ -176,7 +222,7 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onReceiveOrder, items,
     .filter((row) => row.itemNo.trim() && row.itemName.trim() && row.quantity.trim() && row.location.trim())
     .map((row) => ({
       itemNo: row.itemNo.trim(),
-      itemName: row.itemName.trim(),
+      itemName: resolveCatalogItemName(row.itemNo, row.itemName.trim(), catalog),
       quantity: row.quantity.trim(),
       locationCode: row.location.trim(),
     }));
@@ -200,10 +246,9 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onReceiveOrder, items,
 
   // Looked up against materials already known to this page - current
   // stock first (items), then the reference catalog (Katalog materiałów
-  // SM, see lib/smMaterialsCatalog.js) so a material still resolves once
-  // every unit of it has already been issued and it's no longer on the
-  // stock list itself. There's no real backend endpoint for this yet (see
-  // AGENTS.md), so this stands in for one until it exists. Shared by the
+  // SM, backed by wpsapi's sm_catalog - see lib/smCatalogApi.js) so a
+  // material still resolves once every unit of it has already been
+  // issued and it's no longer on the stock list itself. Shared by the
   // single-receipt form below (on blur) and the bulk order-receipt grid
   // (on leaving the itemNo cell - see BulkReceiveGrid's onLookupItemName).
   function lookupItemName(rawItemNo) {
@@ -306,14 +351,16 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onReceiveOrder, items,
             <span className={LABEL_CLS}>{t("receivePanel.locationLabel")}</span>
             <input className={FIELD_CLS} placeholder="MT" value={location} onChange={(e) => setLocation(e.target.value)} />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLS}>{t("receivePanel.unitIdLabel")}</span>
-            <input
-              className={FIELD_CLS}
-              value={unitId}
-              onChange={(e) => setUnitId(e.target.value)}
-            />
-          </label>
+          {needsSpoolId && (
+            <label className="flex flex-col gap-1">
+              <span className={LABEL_CLS}>{t("receivePanel.unitIdLabel")}</span>
+              <input
+                className={FIELD_CLS}
+                value={unitId}
+                onChange={(e) => setUnitId(e.target.value)}
+              />
+            </label>
+          )}
         </form>
         )}
         {receiveMode === "bulk" && incompleteBulkRows && (
@@ -438,17 +485,21 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, onDelete, t }) {
   );
 }
 
-// Every material's issue quantity is editable here, prefilled with its
-// full available amount (same as IssueGroupPanel's per-unit inputs) so
-// the common case - issue everything - needs no typing, but can be
-// lowered to issue only part of it.
+// Every material's issue quantity is editable here. Only prefilled for a
+// unit (spool) row, since a spool is always issued in full - an
+// aggregate/pending row starts blank and must be typed (see the useEffect
+// below), same rule as BulkIssuePanel.
 function IssueUnitPanel({ row, open, onOpenChange, onIssue, t }) {
   const [quantity, setQuantity] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!row) return;
-    setQuantity(String(row.quantity ?? ""));
+    // Same rule as BulkIssuePanel: a unit (spool) is always issued in
+    // full, so prefilling it just shows what will happen if left
+    // untouched. An aggregate row can be issued partially, so it starts
+    // blank - the user must type how much to issue.
+    setQuantity(row.kind === "unit" ? String(row.quantity ?? "") : "");
     setError("");
   }, [row]);
 
@@ -808,14 +859,65 @@ function AssignSpoolNumbersPanel({ item, open, onOpenChange, onAssign, t }) {
   );
 }
 
+// "Stan w czasie" - the kebab menu's chart, opened from any row via
+// RowActionsMenu. Fetches this one item's full operation history fresh on
+// every open (smItemsApi.js's history(), unpaginated - see its own
+// comment for why that's fine at this scale) rather than reusing anything
+// already in memory, so it's always current even if `items` itself is
+// stale for some reason.
+function SmMaterialTrendModal({ item, open, onOpenChange, t }) {
+  const [operations, setOperations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (!open || !item) return;
+    setLoading(true);
+    setLoadError(false);
+    smOperationsApi
+      .history(item.itemNo)
+      .then(setOperations)
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
+  }, [open, item]);
+
+  if (!item) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {item.itemName} - {t("trendModal.titleSuffix")}
+          </DialogTitle>
+        </DialogHeader>
+
+        {loading && <p className="text-sm text-gray-400 dark:text-neutral-500">{t("trendModal.loading")}</p>}
+        {!loading && loadError && <p className="text-sm text-red-600 dark:text-red-400">{t("trendModal.fetchError")}</p>}
+        {!loading && !loadError && operations.length === 0 && (
+          <p className="text-sm text-gray-500 dark:text-neutral-400">{t("trendModal.empty")}</p>
+        )}
+        {!loading && !loadError && operations.length > 0 && <SmMaterialStockChart operations={operations} />}
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            {t("trendModal.close")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Cross-item bulk issue - the toolbar's "Wydaj zaznaczone" opens this for
 // whatever leaf rows (units and/or whole aggregate items) are checked
 // across the table, regardless of which item they belong to. A unit row
-// has no partial concept (same rule as IssueUnitPanel), so its input just
-// displays the full quantity, disabled; an aggregate row's input starts
-// empty and, left blank, issues the full remaining amount too - typing a
-// smaller number issues only that much, same validation as the single-row
-// panel.
+// has no partial concept (same rule as IssueUnitPanel), so its input
+// starts prefilled with its full quantity; an aggregate row's input
+// starts empty since it can be issued partially. A row left blank, or
+// typed as 0, is dropped from the batch entirely (see handleConfirm) -
+// it is never sent as "issue 0", so clearing every row and confirming
+// just issues nothing instead of quietly issuing everything.
 function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
   const [quantities, setQuantities] = useState({});
   const [errors, setErrors] = useState({});
@@ -826,7 +928,7 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
     // quantity so the input still shows what will be issued if left
     // untouched; aggregate rows (a combined quantity that can be issued
     // partially) start empty so the user types how much to issue - leaving
-    // it empty still issues the full available amount (see handleConfirm).
+    // it empty (or typing 0) now drops that row instead (see handleConfirm).
     setQuantities(Object.fromEntries(rows.filter((row) => row.kind !== "aggregate").map((row) => [row.id, String(row.quantity)])));
     setErrors({});
   }, [open, rows]);
@@ -838,19 +940,28 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
 
   function handleConfirm() {
     const nextErrors = {};
+    const toIssue = [];
     rows.forEach((row) => {
       const raw = (quantities[row.id] ?? "").trim();
-      if (!raw) return;
+      if (!raw) return; // blank - drop this row, not an error
       const value = parseFloat(raw.replace(",", "."));
+      if (Number.isFinite(value) && value === 0) return; // explicit 0 - same as blank, drop it
       const available = parseFloat(row.quantity);
-      if (!Number.isFinite(value) || value <= 0) nextErrors[row.id] = t("issuePanel.requiredQuantity");
-      else if (value > available) nextErrors[row.id] = t("issuePanel.maxQuantity", { max: row.quantity });
+      if (!Number.isFinite(value) || value < 0) {
+        nextErrors[row.id] = t("issuePanel.requiredQuantity");
+        return;
+      }
+      if (value > available) {
+        nextErrors[row.id] = t("issuePanel.maxQuantity", { max: row.quantity });
+        return;
+      }
+      toIssue.push({ row, quantity: raw });
     });
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
-    onIssue(rows.map((row) => ({ row, quantity: quantities[row.id]?.trim() || undefined })));
+    if (toIssue.length > 0) onIssue(toIssue);
     onOpenChange(false);
   }
 
@@ -920,6 +1031,30 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
   );
 }
 
+// The one action every row kind shares regardless of what else it can do -
+// a kebab menu opening the item's "Stan w czasie" chart (see
+// SmMaterialTrendModal below). Kept as its own tiny component rather than
+// repeating the DropdownMenu markup in all seven BodyRow branches.
+function RowActionsMenu({ item, onShowTrend, t }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <button type="button" title={t("actions.moreActions")} className={ROW_ACTION_CLS}>
+            <MoreVertical className="h-4 w-4" />
+          </button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => onShowTrend(item)} className="gap-2">
+          <TrendingUp className="h-4 w-4" />
+          {t("actions.trend")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // One case per bodyRows entry kind (see the useMemo below). Memoized with
 // a comparator that only looks at the data that actually determines what
 // this specific row renders (row.item/row.unit by reference - stable
@@ -953,6 +1088,7 @@ const BodyRow = memo(function BodyRow({
   onIssue,
   onIssueGroup,
   onAssignUnits,
+  onShowTrend,
 }) {
   if (row.kind === "aggregate") {
     const item = row.item;
@@ -985,6 +1121,7 @@ const BodyRow = memo(function BodyRow({
             <button type="button" title={t("actions.issue")} onClick={() => onIssue(actionRow)} className={ROW_ACTION_CLS}>
               <PackageMinus className="h-4 w-4" />
             </button>
+            <RowActionsMenu item={item} onShowTrend={onShowTrend} t={t} />
           </div>
         </TableCell>
       </TableRow>
@@ -1015,6 +1152,7 @@ const BodyRow = memo(function BodyRow({
             <button type="button" title={t("actions.issue")} onClick={() => onIssue(actionRow)} className={ROW_ACTION_CLS}>
               <PackageMinus className="h-4 w-4" />
             </button>
+            <RowActionsMenu item={item} onShowTrend={onShowTrend} t={t} />
           </div>
         </TableCell>
       </TableRow>
@@ -1050,6 +1188,7 @@ const BodyRow = memo(function BodyRow({
             <button type="button" title={t("actions.issue")} onClick={() => onIssue(actionRow)} className={ROW_ACTION_CLS}>
               <PackageMinus className="h-4 w-4" />
             </button>
+            <RowActionsMenu item={item} onShowTrend={onShowTrend} t={t} />
           </div>
         </TableCell>
       </TableRow>
@@ -1093,6 +1232,7 @@ const BodyRow = memo(function BodyRow({
             <button type="button" title={t("actions.issue")} onClick={() => onIssueGroup(item)} className={ROW_ACTION_CLS}>
               <PackageMinus className="h-4 w-4" />
             </button>
+            <RowActionsMenu item={item} onShowTrend={onShowTrend} t={t} />
           </div>
         </TableCell>
       </TableRow>
@@ -1128,6 +1268,7 @@ const BodyRow = memo(function BodyRow({
             <button type="button" title={t("actions.issue")} onClick={() => onIssue(pendingActionRow)} className={ROW_ACTION_CLS}>
               <PackageMinus className="h-4 w-4" />
             </button>
+            <RowActionsMenu item={item} onShowTrend={onShowTrend} t={t} />
           </div>
         </TableCell>
       </TableRow>
@@ -1159,6 +1300,7 @@ const BodyRow = memo(function BodyRow({
             <button type="button" title={t("actions.issue")} onClick={() => onIssue(pendingActionRow)} className={ROW_ACTION_CLS}>
               <PackageMinus className="h-4 w-4" />
             </button>
+            <RowActionsMenu item={item} onShowTrend={onShowTrend} t={t} />
           </div>
         </TableCell>
       </TableRow>
@@ -1198,6 +1340,7 @@ const BodyRow = memo(function BodyRow({
           <button type="button" title={t("actions.issue")} onClick={() => onIssue(actionRow)} className={ROW_ACTION_CLS}>
             <PackageMinus className="h-4 w-4" />
           </button>
+          <RowActionsMenu item={item} onShowTrend={onShowTrend} t={t} />
         </div>
       </TableCell>
     </TableRow>
@@ -1220,8 +1363,22 @@ export default function SmMaterialsPanel() {
   const t = useTranslations("materialsListSm");
   const tActions = useTranslations("stock.actions");
   const tStock = useTranslations("stock");
-  const [items, setItems] = useState(INITIAL_ITEMS);
-  const [search, setSearch] = useState("");
+  // Backed by wpsapi's sm_items/sm_units (see lib/smItemsApi.js) - fetched
+  // once on mount, then kept in sync by setItems below, which wraps the
+  // raw setter so every existing setItems((prev) => next) call site
+  // (unchanged) also persists whatever it changed, with no call site
+  // needing to know about the API itself.
+  const [items, setItemsRaw] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsLoadError, setItemsLoadError] = useState(false);
+  // Three dedicated text filters (item no/name/location) instead of one
+  // combined box - all client-side against the already-loaded `items`
+  // array (this page has no pagination, unlike Historia operacji SM, so
+  // there's no "second page" this can miss). AND-combined with each other
+  // and with the column-header filters below (nameFilter/note/quantity).
+  const [itemNoQuery, setItemNoQuery] = useState("");
+  const [itemNameQuery, setItemNameQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
   // Table filters: narrow the already-loaded items.
   const [columnFilters, setColumnFilters] = useState({ note: "", quantityMin: "", quantityMax: "" });
   // itemName is a bounded catalog field (same materials list, same shape as
@@ -1236,6 +1393,7 @@ export default function SmMaterialsPanel() {
   const [issuingRow, setIssuingRow] = useState(null);
   const [issuingGroup, setIssuingGroup] = useState(null);
   const [assigningItem, setAssigningItem] = useState(null);
+  const [trendItem, setTrendItem] = useState(null);
   const [bulkIssueOpen, setBulkIssueOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const { toasts, pushToast, dismissToast } = useToastStack();
@@ -1243,30 +1401,69 @@ export default function SmMaterialsPanel() {
   const [expandedItems, setExpandedItems] = useState({});
   const [viewMode, setViewMode] = useState("grouped");
   const [columnSizing, setColumnSizing] = useState({});
-  // Operation log feeding /materials-list-sm/history-sm (SmMaterialsHistoryTable
-  // reads the same key) - see logOperation below for what gets written.
-  const [, setOperationHistory] = useLocalStorage(SM_HISTORY_STORAGE_KEY, SM_HISTORY_SEED);
   // Read-only here - Katalog materiałów SM (/materials-list-sm/catalog-sm,
-  // SmMaterialsCatalogTable) owns writing to this key; this page only
+  // SmMaterialsCatalogTable) owns writing to sm_catalog; this page only
   // reads it, to autofill a material's name in ReceiveUnitPanel (see
-  // handleItemNoBlur).
-  const [catalog] = useLocalStorage(SM_CATALOG_STORAGE_KEY, SM_CATALOG_SEED);
+  // handleItemNoBlur). Failure just means autofill doesn't fire - not
+  // worth its own error UI on a page that isn't primarily about the catalog.
+  const [catalog, setCatalog] = useState([]);
   const [operator, setOperator] = useState("");
 
   useEffect(() => {
-    getCipSession().then((session) => setOperator(session?.username ?? ""));
+    // userId here is CIP's own employee number/login id (see cipSession.js -
+    // session.username is actually the full name despite the field name;
+    // "Wykonał" in Historia operacji SM should read as an employee number,
+    // same as the small text under the name in the dashboard header).
+    getCipSession().then((session) => setOperator(session?.userId ?? ""));
   }, []);
+
+  useEffect(() => {
+    smCatalogApi.list().then(setCatalog).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    smItemsApi
+      .list()
+      .then(setItemsRaw)
+      .catch(() => setItemsLoadError(true))
+      .finally(() => setItemsLoading(false));
+  }, []);
+
+  // Wraps the raw setter so every existing setItems((prev) => next) call
+  // site in this file keeps working unchanged, while also persisting
+  // whatever it actually changed. Compares by reference, not deep equal -
+  // every reducer in this file already builds a fresh object for an item
+  // it touches and keeps the same reference for one it doesn't (the
+  // ordinary `.map((it) => it.itemNo === x ? {...it, ...} : it)` pattern
+  // used throughout), so a plain !== check reliably finds exactly the
+  // changed/added items without a manual diff at each of the ~10 call
+  // sites. A failed sync is swallowed here (not surfaced as an error) -
+  // the local UI already reflects the change either way; only a later
+  // reload would show it missing, same trade-off as sm_catalog's own
+  // autofill fetch.
+  function setItems(updater) {
+    setItemsRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      const prevByNo = new Map(prev.map((it) => [it.itemNo, it]));
+      const nextByNo = new Map(next.map((it) => [it.itemNo, it]));
+      for (const [itemNo, item] of nextByNo) {
+        if (prevByNo.get(itemNo) !== item) smItemsApi.upsert(item).catch(() => {});
+      }
+      for (const itemNo of prevByNo.keys()) {
+        if (!nextByNo.has(itemNo)) smItemsApi.remove(itemNo).catch(() => {});
+      }
+      return next;
+    });
+  }
 
   // Called from every mutation entry point (handleCreate/handleIssue/
   // handleIssueUnits/handleBulkIssue) right after the matching setItems
-  // call - one log entry per physical unit/aggregate actually moved, newest
-  // first, capped the same way CipMaterialsHistoryTable's own CIP-backed
-  // history is.
+  // call - one log entry per physical unit/aggregate actually moved.
+  // Posts straight to sm_operations (SmMaterialsHistoryTable reads from
+  // there); the id/time/ordering/500-row cap are all the server's job now
+  // (see wpsapi's src/smOperations.js), not this page's.
   function logOperation(entries) {
-    const time = new Date().toISOString();
-    setOperationHistory((prev) =>
-      [...entries.map((entry) => ({ id: makeSmHistoryId(), operator, time, ...entry })), ...prev].slice(0, SM_HISTORY_LIMIT)
-    );
+    smOperationsApi.create(entries.map((entry) => ({ ...entry, operator }))).catch(() => {});
   }
 
   // Plain drag-to-resize, seeded with the header's measured on-screen width
@@ -1378,19 +1575,17 @@ export default function SmMaterialsPanel() {
   );
 
   const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const itemNoQ = itemNoQuery.trim().toLowerCase();
+    const itemNameQ = itemNameQuery.trim().toLowerCase();
+    const locationQ = locationQuery.trim().toLowerCase();
     const noteQuery = columnFilters.note.trim().toLowerCase();
     const min = parseFloat(columnFilters.quantityMin);
     const max = parseFloat(columnFilters.quantityMax);
 
     return items.filter((it) => {
-      if (q) {
-        const matchesSearch =
-          it.itemNo.toLowerCase().includes(q) ||
-          it.itemName.toLowerCase().includes(q) ||
-          (it.units ?? []).some((u) => u.unitId.toLowerCase().includes(q));
-        if (!matchesSearch) return false;
-      }
+      if (itemNoQ && !it.itemNo.toLowerCase().includes(itemNoQ)) return false;
+      if (itemNameQ && !it.itemName.toLowerCase().includes(itemNameQ)) return false;
+      if (locationQ && !it.locationCode.toLowerCase().includes(locationQ)) return false;
       if (nameFilter && !nameFilter.includes(it.itemName)) return false;
       if (noteQuery && !(it.note ?? "").toLowerCase().includes(noteQuery)) return false;
       const qty = itemQuantityValue(it);
@@ -1398,7 +1593,7 @@ export default function SmMaterialsPanel() {
       if (!Number.isNaN(max) && qty > max) return false;
       return true;
     });
-  }, [items, search, columnFilters, nameFilter]);
+  }, [items, itemNoQuery, itemNameQuery, locationQuery, columnFilters, nameFilter]);
 
   const hasColumnFilter = (key) => columnFilters[key].trim() !== "";
   const hasQuantityFilter = columnFilters.quantityMin.trim() !== "" || columnFilters.quantityMax.trim() !== "";
@@ -1529,26 +1724,59 @@ export default function SmMaterialsPanel() {
     pushToast(t("toast.received", { itemName: unit.itemName, quantity: unit.quantity }));
   }
 
-  // "Przyjęcie zamówienia" (order receipt) - the real order list this
-  // mirrors (see AGENTS.md) never carries spool numbers, only item +
-  // summed quantity, so this doesn't create a numbered unit like
-  // handleCreate/receiveUnit above. It adds to (or creates) the item's
-  // pendingQuantity instead - real stock, already on hand, waiting for
-  // spool numbers once the physical units are labeled (see
-  // handleAssignUnits/AssignSpoolNumbersPanel). An item that doesn't
-  // exist yet is created as trackedIndividually with an empty units
-  // array, since order-received items are always meant to end up
-  // per-spool tracked.
-  function receivePendingQuantity(itemsArr, entry) {
+  // Same idea as receiveUnit, for a material the catalog says is *not*
+  // individually tracked (no spool number to ask for in ReceiveUnitPanel)
+  // - adds straight onto the item's combined totalQuantity instead of
+  // pushing a new unit, creating the aggregate row if it doesn't exist yet.
+  function receiveAggregate(itemsArr, entry) {
     const idx = itemsArr.findIndex((it) => it.itemNo === entry.itemNo);
     if (idx === -1) {
+      return [
+        { itemNo: entry.itemNo, itemName: entry.itemName, locationCode: entry.locationCode, note: "-", trackedIndividually: false, totalQuantity: entry.quantity },
+        ...itemsArr,
+      ];
+    }
+    const next = [...itemsArr];
+    const sum = (parseFloat(next[idx].totalQuantity) || 0) + (parseFloat(entry.quantity) || 0);
+    next[idx] = { ...next[idx], totalQuantity: sum % 1 === 0 ? String(sum) : sum.toFixed(3) };
+    return next;
+  }
+
+  function handleCreateAggregate(entry) {
+    setItems((prev) => receiveAggregate(prev, entry));
+    logOperation([{ operation: "receipt", itemNo: entry.itemNo, itemName: entry.itemName, unitId: "", quantity: entry.quantity, location: entry.locationCode }]);
+    pushToast(t("toast.received", { itemName: entry.itemName, quantity: entry.quantity }));
+  }
+
+  // "Przyjęcie zamówienia" (order receipt) - the real order list this
+  // mirrors (see AGENTS.md) never carries spool numbers, only item +
+  // summed quantity. For an individually-tracked material (only plain
+  // FRP - see sm_catalog) this doesn't create a numbered unit like
+  // handleCreate/receiveUnit above; it adds to (or creates) the item's
+  // pendingQuantity instead - real stock, already on hand, waiting for
+  // spool numbers once the physical units are labeled (see
+  // handleAssignUnits/AssignSpoolNumbersPanel). Everything else (the
+  // common case for a pasted order list - yarn, tape, masterbatch...) has
+  // no per-unit form to speak of, so it goes straight through
+  // receiveAggregate instead: no pendingQuantity, no assign-later step,
+  // no expand chevron. Previously this always took the individually-
+  // tracked branch regardless of material, which is why pasting a list
+  // of ordinary aggregate materials made every one of them expandable.
+  function receivePendingQuantity(itemsArr, entry) {
+    const idx = itemsArr.findIndex((it) => it.itemNo === entry.itemNo);
+    const existing = idx === -1 ? null : itemsArr[idx];
+    const trackedIndividually = existing
+      ? existing.trackedIndividually
+      : Boolean(catalog.find((it) => it.itemNo.toLowerCase() === entry.itemNo.trim().toLowerCase())?.individualUnits);
+    if (!trackedIndividually) return receiveAggregate(itemsArr, entry);
+
+    if (!existing) {
       return [
         { itemNo: entry.itemNo, itemName: entry.itemName, locationCode: entry.locationCode, note: "-", trackedIndividually: true, units: [], pendingQuantity: entry.quantity },
         ...itemsArr,
       ];
     }
     const next = [...itemsArr];
-    const existing = next[idx];
     const total = (parseFloat(existing.pendingQuantity) || 0) + (parseFloat(entry.quantity) || 0);
     next[idx] = { ...existing, pendingQuantity: total % 1 === 0 ? String(total) : total.toFixed(3) };
     return next;
@@ -1574,7 +1802,7 @@ export default function SmMaterialsPanel() {
   // spools are labeled. Does NOT add new stock - that quantity was
   // already counted by handleReceiveOrder - so it's logged as its own
   // "labeling" operation kind, not another "receipt" (see
-  // AssignSpoolNumbersPanel and lib/smOperationHistory.js).
+  // AssignSpoolNumbersPanel and wpsapi's src/smOperations.js).
   function handleAssignUnits(item, draftRows) {
     const newUnits = draftRows.map((row) => ({
       id: `u-${Date.now()}-${row.id}`,
@@ -1748,17 +1976,37 @@ export default function SmMaterialsPanel() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-navy-950 dark:text-white">{t("title")}</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold text-navy-950 dark:text-white">{t("title")}</h1>
+        {itemsLoading && <span className="text-xs font-medium text-gray-400 dark:text-neutral-500">{t("loading")}</span>}
+        {itemsLoadError && <span className="text-xs font-medium text-red-600 dark:text-red-400">{t("fetchError")}</span>}
+      </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="relative max-w-sm flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-neutral-500" />
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="relative w-44">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-neutral-500" />
+            <input
+              type="text"
+              value={itemNoQuery}
+              onChange={(e) => setItemNoQuery(e.target.value)}
+              placeholder={t("columns.itemNo")}
+              className="h-9 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 pl-9 pr-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
+            />
+          </div>
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("columns.itemNo") + " / " + t("columns.itemName") + " / " + t("columns.unitId")}
-            className="h-9 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 pl-9 pr-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
+            value={itemNameQuery}
+            onChange={(e) => setItemNameQuery(e.target.value)}
+            placeholder={t("columns.itemName")}
+            className="h-9 w-52 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
+          />
+          <input
+            type="text"
+            value={locationQuery}
+            onChange={(e) => setLocationQuery(e.target.value)}
+            placeholder={t("columns.location")}
+            className="h-9 w-36 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
           />
         </div>
         <div className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 p-1">
@@ -2019,6 +2267,13 @@ export default function SmMaterialsPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {items.length === 0 && !itemsLoading && !itemsLoadError && (
+              <TableRow>
+                <TableCell colSpan={99} className="py-10 text-center text-sm text-gray-500 dark:text-neutral-400">
+                  {t("empty")}
+                </TableCell>
+              </TableRow>
+            )}
             {bodyRows.map((row) => {
               const isGroupParent = row.kind === "groupParent";
               const hasNoSelection = isGroupParent || row.kind === "pendingChild" || row.kind === "pendingRow";
@@ -2041,6 +2296,7 @@ export default function SmMaterialsPanel() {
                   onIssue={setIssuingRow}
                   onIssueGroup={setIssuingGroup}
                   onAssignUnits={setAssigningItem}
+                  onShowTrend={setTrendItem}
                 />
               );
             })}
@@ -2058,6 +2314,7 @@ export default function SmMaterialsPanel() {
         open={receiveOpen}
         onOpenChange={setReceiveOpen}
         onCreate={handleCreate}
+        onCreateAggregate={handleCreateAggregate}
         onReceiveOrder={handleReceiveOrder}
         items={items}
         catalog={catalog}
@@ -2084,6 +2341,12 @@ export default function SmMaterialsPanel() {
         open={Boolean(assigningItem)}
         onOpenChange={(open) => !open && setAssigningItem(null)}
         onAssign={handleAssignUnits}
+        t={t}
+      />
+      <SmMaterialTrendModal
+        item={trendItem}
+        open={Boolean(trendItem)}
+        onOpenChange={(open) => !open && setTrendItem(null)}
         t={t}
       />
       <BulkIssuePanel

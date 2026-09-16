@@ -107,7 +107,6 @@
       "materialsItemNo": "Nr itemu",
       "materialsItemName": "Nazwa",
       "materialsIndividualUnits": "Osobne jednostki",
-      "materialsUnitType": "Forma jednostki",
       "materialsSpec": "Specyfikacja",
       "materialsLocation": "Lokalizacja",
       "materialsCreateTime": "Data utworzenia",
@@ -304,6 +303,9 @@
   },
   "materialsListSm": {
     "title": "Lista materiałów SM",
+    "loading": "Ładowanie…",
+    "fetchError": "Nie udało się pobrać listy z API.",
+    "empty": "Brak materiałów. Użyj przycisku „Przyjęcie”, aby dodać pierwszy.",
     "addReceipt": "Przyjęcie",
     "viewMode": {
       "grouped": "Pogrupowane",
@@ -339,7 +341,16 @@
       "edit": "Edytuj",
       "issue": "Wydaj",
       "assign": "Przypisz numery jednostek",
+      "trend": "Stan w czasie",
+      "moreActions": "Więcej akcji",
       "confirmDeleteZero": "Usunąć {itemName} z listy? Ilość wynosi 0."
+    },
+    "trendModal": {
+      "titleSuffix": "stan w czasie",
+      "loading": "Ładowanie historii materiału…",
+      "fetchError": "Nie udało się pobrać historii materiału.",
+      "empty": "Brak zarejestrowanych operacji dla tego materiału.",
+      "close": "Zamknij"
     },
     "pending": {
       "unitLabel": "Brak"
@@ -363,7 +374,7 @@
       "itemNameLabel": "Nazwa materiału",
       "quantityLabel": "Ilość",
       "locationLabel": "Lokalizacja",
-      "unitIdLabel": "Numer jednostki",
+      "unitIdLabel": "Numer szpuli (opcjonalnie)",
       "modeSingle": "Pojedyncze przyjęcie",
       "modeBulk": "Przyjęcie zamówienia",
       "addRow": "+ Dodaj wiersz",
@@ -412,17 +423,24 @@
   },
   "materialsHistorySm": {
     "title": "Historia operacji SM",
-    "subtitle": "Przyjęcia i wydania zarejestrowane w Materiałach SM na tym urządzeniu.",
+    "subtitle": "Przyjęcia i wydania zarejestrowane w Materiałach SM.",
+    "loading": "Ładowanie…",
+    "fetchError": "Nie udało się pobrać historii z API.",
     "count": "Pozycji: {count}",
     "operationIn": "Przyjęcie",
     "operationOut": "Wydanie",
     "operationLabeling": "Etykietowanie",
-    "empty": "Brak zarejestrowanych operacji. Przyjęcia i wydania z Materiałów SM będą pojawiać się tutaj."
+    "empty": "Brak zarejestrowanych operacji. Przyjęcia i wydania z Materiałów SM będą pojawiać się tutaj.",
+    "prevPage": "Poprzednia",
+    "nextPage": "Następna",
+    "pageOf": "Strona {current} z {total}"
   },
   "materialsCatalogSm": {
     "title": "Katalog materiałów SM",
     "subtitle": "Referencyjna lista materiałów SM - numer itemu i nazwa, używana do podpowiadania nazwy przy przyjęciach. Dodaj tu nowy materiał, zanim zaczniesz go przyjmować.",
     "count": "Pozycji: {count}",
+    "loading": "Ładowanie…",
+    "fetchError": "Nie udało się pobrać katalogu z API.",
     "actions": {
       "add": "Dodaj materiał",
       "edit": "Edytuj",
@@ -435,15 +453,10 @@
       "itemName": "Nazwa",
       "individualUnitsLabel": "Materiał rozdzielony na jednostki",
       "individualUnitsHint": "Zaznacz, jeśli ilości tego materiału mają być rozdzielone na osobne, numerowane obiekty (np. szpule) zamiast sumować się w jedną łączną wartość.",
-      "unitTypeLabel": "Forma jednostki",
       "cancel": "Anuluj",
       "required": "Podaj numer itemu i nazwę.",
       "duplicate": "Ten numer itemu już jest w katalogu."
-    },
-    "unitTypeSpool": "Szpula",
-    "unitTypeBigbag": "Bigbag",
-    "unitTypeThread": "Nić",
-    "unitTypeOther": "Inna"
+    }
   },
   "materialsHistory": {
     "title": "Historia operacji",

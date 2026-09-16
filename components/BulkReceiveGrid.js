@@ -335,6 +335,9 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, onLookupItem
   // here instead: extend `rows` first so every pasted row has somewhere to
   // land, then apply the values directly and tell glide not to also run its
   // own (now-redundant, and too-short) default paste.
+  const ITEM_NO_COL = COLUMN_FIELDS.indexOf("itemNo");
+  const ITEM_NAME_COL = COLUMN_FIELDS.indexOf("itemName");
+
   function handlePaste([startCol, startRow], values) {
     const next = rows.map((row) => ({ ...row }));
     while (next.length < startRow + values.length) next.push(newBulkReceiveRow());
@@ -343,6 +346,18 @@ export default function BulkReceiveGrid({ rows, onChange, onAddRow, onLookupItem
         const field = COLUMN_FIELDS[startCol + c];
         if (field) next[startRow + r][field] = sanitizeField(field, value ?? "");
       });
+      // Pasting just the "Nr itemu" column (no Nazwa alongside it in the
+      // same block) autofills every row's name right away, same lookup
+      // handleGridSelectionChange already does on leaving a single itemNo
+      // cell - otherwise a pasted column of item numbers would leave every
+      // row's Nazwa blank until each one is individually tabbed through.
+      // A paste that already carries its own Nazwa column is left alone.
+      const pastedItemNo = startCol <= ITEM_NO_COL && ITEM_NO_COL < startCol + rowValues.length;
+      const pastedItemName = startCol <= ITEM_NAME_COL && ITEM_NAME_COL < startCol + rowValues.length;
+      if (pastedItemNo && !pastedItemName && onLookupItemName) {
+        const name = onLookupItemName(next[startRow + r].itemNo);
+        if (name) next[startRow + r].itemName = name;
+      }
     });
     commitRows(next);
     return false;

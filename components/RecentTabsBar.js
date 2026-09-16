@@ -33,7 +33,14 @@ function SortableTab({ href, active, onClose, showClose, suppressClickRef }) {
   const Icon = page.icon;
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    // CSS.Transform (not used here) bakes a scaleX/scaleY into the
+    // transform so the dragged tab visually stretches/shrinks to match
+    // whichever tab's slot it's currently over mid-drag, since tabs are
+    // variable-width (their own label length) - CSS.Translate keeps only
+    // the translate3d component, so the dragged tab keeps its own width
+    // the whole time and only the drop position (still correct either
+    // way) moves.
+    transform: CSS.Translate.toString(transform),
     transition,
   };
 

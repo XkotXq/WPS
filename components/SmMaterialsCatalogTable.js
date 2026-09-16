@@ -1,32 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { useLocalStorage } from "usehooks-ts";
+import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MaterialsTable from "@/components/MaterialsTable";
 import FrpFilters from "@/components/FrpFilters";
-import { SM_CATALOG_SEED, SM_CATALOG_STORAGE_KEY } from "@/lib/smMaterialsCatalog";
+import { smCatalogApi } from "@/lib/smCatalogApi";
 
 const inputClasses =
   "w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:border-navy-700 dark:focus:border-navy-400 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400";
 const fieldLabelClasses = "text-xs font-medium text-gray-500 dark:text-neutral-400";
 
-const EMPTY_FORM = { itemNo: "", itemName: "", individualUnits: true, unitType: "spool" };
-
-const UNIT_TYPE_LABEL_KEYS = { spool: "unitTypeSpool", bigbag: "unitTypeBigbag", thread: "unitTypeThread", other: "unitTypeOther" };
-
-function UnitTypeLabel({ unitType }) {
-  const t = useTranslations("materialsCatalogSm");
-  if (!unitType) return <span className="text-gray-400 dark:text-neutral-500">-</span>;
-  return <span>{t(UNIT_TYPE_LABEL_KEYS[unitType] ?? "unitTypeOther")}</span>;
-}
+const EMPTY_FORM = { itemNo: "", itemName: "", individualUnits: true };
 
 // Mirrors CatalogTable.js's (Baza FRP) own add/edit-in-a-popover form
 // shape - same interaction pattern, just itemNo+itemName only for now
-// (see lib/smMaterialsCatalog.js) instead of Baza FRP's full
+// (see wpsapi's src/smCatalog.js) instead of Baza FRP's full
 // number/label/name/type/mmc set.
 function EntryForm({ initial, onSubmit, onCancel, submitLabel, t }) {
   const [form, setForm] = useState(() => initial ?? EMPTY_FORM);
@@ -43,12 +34,10 @@ function EntryForm({ initial, onSubmit, onCancel, submitLabel, t }) {
       setError(t("form.required"));
       return;
     }
-    const individualUnits = Boolean(form.individualUnits);
     const ok = onSubmit({
       itemNo: form.itemNo.trim(),
       itemName: form.itemName.trim(),
-      individualUnits,
-      unitType: individualUnits ? form.unitType || "spool" : undefined,
+      individualUnits: Boolean(form.individualUnits),
     });
     if (ok === false) {
       setError(t("form.duplicate"));
@@ -85,17 +74,6 @@ function EntryForm({ initial, onSubmit, onCancel, submitLabel, t }) {
           <span className="block text-xs text-gray-500 dark:text-neutral-400">{t("form.individualUnitsHint")}</span>
         </span>
       </label>
-      {form.individualUnits && (
-        <div>
-          <label className={fieldLabelClasses}>{t("form.unitTypeLabel")}</label>
-          <select value={form.unitType || "spool"} onChange={(event) => set("unitType", event.target.value)} className={inputClasses}>
-            <option value="spool">{t("unitTypeSpool")}</option>
-            <option value="bigbag">{t("unitTypeBigbag")}</option>
-            <option value="thread">{t("unitTypeThread")}</option>
-            <option value="other">{t("unitTypeOther")}</option>
-          </select>
-        </div>
-      )}
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex items-center gap-2 pt-1">
         <Button type="submit" size="sm">
@@ -113,62 +91,74 @@ const COLUMNS = [
   { key: "itemNo", headerKey: "materialsItemNo", filterFn: "includesString", sortable: true },
   { key: "itemName", headerKey: "materialsItemName", filterFn: "includesString", sortable: true },
   { key: "individualUnits", headerKey: "materialsIndividualUnits", type: "boolean", filterFn: "equals", sortable: true },
-  {
-    key: "unitType",
-    headerKey: "materialsUnitType",
-    filterFn: "multiselect",
-    sortable: true,
-    render: (row) => <UnitTypeLabel unitType={row.unitType} />,
-  },
 ];
 
-// Local-only reference catalog (see lib/smMaterialsCatalog.js) - not tied
-// to CIP or any backend, same as the rest of Materiały SM. Add/edit/delete
-// here is what "jeżeli będzie jakiś nowy materiał używany, to tam będzie
-// można dodać" (a newly-used material can be added here) refers to;
-// ReceiveUnitPanel's handleItemNoBlur reads this same storage key to
-// autofill a material's name once its item number is known.
+// Backed by wpsapi's sm_catalog table (src/smCatalog.js /
+// routes/smCatalog.js) - a reference list of every known material,
+// shared across whoever opens this page, not per-device like the rest of
+// Materiały SM. Add/edit/delete here is what "jeżeli będzie jakiś nowy
+// materiał używany, to tam będzie można dodać" (a newly-used material can
+// be added here) refers to; ReceiveUnitPanel's handleItemNoBlur fetches
+// from the same endpoint to autofill a material's name once its item
+// number is known.
 export default function SmMaterialsCatalogTable() {
   const t = useTranslations("materialsCatalogSm");
-  const [catalog, setCatalog] = useLocalStorage(SM_CATALOG_STORAGE_KEY, SM_CATALOG_SEED);
+  const [catalog, setCatalog] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [editOpenFor, setEditOpenFor] = useState(null);
 
-  // `?? true` covers rows saved by an earlier build of this catalog (or its
-  // now-inverted `stackable` field) - defaulting to individually-tracked
-  // keeps every pre-existing entry's displayed meaning the same as before
-  // this checkbox was flipped, instead of silently flipping their data too.
-  // Same idea for `unitType`: rows saved before this field existed get
-  // "spool" (matching every real unit's own default) as long as they're
-  // still individually tracked - otherwise it stays unset (not applicable).
-  const rows = catalog.map((entry) => {
-    const individualUnits = entry.individualUnits ?? true;
-    return { id: entry.itemNo, ...entry, individualUnits, unitType: individualUnits ? entry.unitType ?? "spool" : undefined };
-  });
+  useEffect(() => {
+    let cancelled = false;
+    smCatalogApi
+      .list()
+      .then((data) => {
+        if (!cancelled) setCatalog(data);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  function handleCreate(entry) {
-    if (catalog.some((it) => it.itemNo.toLowerCase() === entry.itemNo.toLowerCase())) return false;
-    setCatalog((prev) => [entry, ...prev]);
-    setAddOpen(false);
+  const rows = catalog.map((entry) => ({ id: entry.itemNo, ...entry }));
+
+  async function handleCreate(entry) {
+    try {
+      const created = await smCatalogApi.create(entry);
+      setCatalog((prev) => [created, ...prev]);
+      setAddOpen(false);
+    } catch (err) {
+      if (err.status === 409) return false;
+      throw err;
+    }
   }
 
-  function handleUpdate(itemNo, entry) {
-    setCatalog((prev) =>
-      prev.map((it) => (it.itemNo === itemNo ? { ...it, itemName: entry.itemName, individualUnits: entry.individualUnits, unitType: entry.unitType } : it))
-    );
+  async function handleUpdate(itemNo, entry) {
+    const updated = await smCatalogApi.update(itemNo, entry);
+    setCatalog((prev) => prev.map((it) => (it.itemNo === itemNo ? updated : it)));
     setEditOpenFor(null);
   }
 
-  function handleDelete(itemNo) {
+  async function handleDelete(itemNo) {
     if (!window.confirm(t("actions.confirmDelete", { itemNo }))) return;
+    await smCatalogApi.remove(itemNo);
     setCatalog((prev) => prev.filter((it) => it.itemNo !== itemNo));
   }
 
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: catalog.length })}</p>
+        <p className="text-sm text-gray-500 dark:text-neutral-400">
+          {loading ? t("loading") : loadError ? t("fetchError") : t("count", { count: catalog.length })}
+        </p>
         <Popover open={addOpen} onOpenChange={setAddOpen}>
           <PopoverTrigger
             render={

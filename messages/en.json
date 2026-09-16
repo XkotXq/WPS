@@ -107,7 +107,6 @@
       "materialsItemNo": "Item no.",
       "materialsItemName": "Name",
       "materialsIndividualUnits": "Separate units",
-      "materialsUnitType": "Unit form",
       "materialsSpec": "Specification",
       "materialsLocation": "Location",
       "materialsCreateTime": "Created at",
@@ -304,6 +303,9 @@
   },
   "materialsListSm": {
     "title": "SM Materials List",
+    "loading": "Loading…",
+    "fetchError": "Failed to fetch the list from the API.",
+    "empty": "No materials yet. Use the \"Receipt\" button to add the first one.",
     "addReceipt": "Receipt",
     "viewMode": {
       "grouped": "Grouped",
@@ -339,7 +341,16 @@
       "edit": "Edit",
       "issue": "Issue",
       "assign": "Assign unit numbers",
+      "trend": "Stock over time",
+      "moreActions": "More actions",
       "confirmDeleteZero": "Delete {itemName} from the list? Its quantity is 0."
+    },
+    "trendModal": {
+      "titleSuffix": "stock over time",
+      "loading": "Loading material history…",
+      "fetchError": "Failed to fetch the material's history.",
+      "empty": "No operations recorded for this material yet.",
+      "close": "Close"
     },
     "pending": {
       "unitLabel": "Missing"
@@ -363,7 +374,7 @@
       "itemNameLabel": "Material name",
       "quantityLabel": "Quantity",
       "locationLabel": "Location",
-      "unitIdLabel": "Unit number",
+      "unitIdLabel": "Spool number (optional)",
       "modeSingle": "Single receipt",
       "modeBulk": "Order receipt",
       "addRow": "+ Add row",
@@ -412,17 +423,24 @@
   },
   "materialsHistorySm": {
     "title": "SM Operation History",
-    "subtitle": "Receipts and issues recorded in SM Materials on this device.",
+    "subtitle": "Receipts and issues recorded in SM Materials.",
+    "loading": "Loading…",
+    "fetchError": "Failed to fetch the history from the API.",
     "count": "Items: {count}",
     "operationIn": "Receipt",
     "operationOut": "Issue",
     "operationLabeling": "Labeling",
-    "empty": "No operations recorded yet. Receipts and issues from SM Materials will show up here."
+    "empty": "No operations recorded yet. Receipts and issues from SM Materials will show up here.",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "pageOf": "Page {current} of {total}"
   },
   "materialsCatalogSm": {
     "title": "SM Materials Catalog",
     "subtitle": "Reference list of SM materials - item number and name, used to suggest a name during receipts. Add a new material here before receiving it.",
     "count": "Items: {count}",
+    "loading": "Loading…",
+    "fetchError": "Failed to fetch the catalog from the API.",
     "actions": {
       "add": "Add material",
       "edit": "Edit",
@@ -435,15 +453,10 @@
       "itemName": "Name",
       "individualUnitsLabel": "Material split into units",
       "individualUnitsHint": "Check this if this material's quantities should be split into separate, numbered objects (e.g. spools) instead of being summed into one combined value.",
-      "unitTypeLabel": "Unit form",
       "cancel": "Cancel",
       "required": "Enter an item number and name.",
       "duplicate": "This item number is already in the catalog."
-    },
-    "unitTypeSpool": "Spool",
-    "unitTypeBigbag": "Bigbag",
-    "unitTypeThread": "Thread",
-    "unitTypeOther": "Other"
+    }
   },
   "materialsHistory": {
     "title": "Operation History",
