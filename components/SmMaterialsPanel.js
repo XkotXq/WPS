@@ -1102,59 +1102,58 @@ function BulkIssuePanel({ rows, open, onOpenChange, onIssue, t }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[67.2rem]">
-        <DialogHeader>
+        <DialogHeader className="flex-row items-center justify-between gap-3 pr-10">
           <DialogTitle>{t("bulkIssuePanel.title")}</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800/50 p-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            title={t("bulkIssuePanel.setFull")}
-            disabled={!someChecked}
-            onClick={handleFillFull}
-          >
-            <CheckCheck className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            title={t("bulkIssuePanel.setLastReceipt")}
-            disabled={!someChecked || loadingLastReceipt}
-            onClick={handleFillLastReceipt}
-          >
-            <History className="h-4 w-4" />
-          </Button>
-          <Popover>
-            <PopoverTrigger
-              render={
-                <Button type="button" variant="outline" size="icon-sm" title={t("bulkIssuePanel.setSameQuantity")} disabled={!someChecked}>
-                  <Equal className="h-4 w-4" />
-                </Button>
-              }
-            />
-            <PopoverContent align="start" className="w-64">
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLS}>{t("bulkIssuePanel.setSameQuantity")}</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    autoFocus
-                    value={bulkQuantity}
-                    onChange={(e) => setBulkQuantity(sanitizeQuantityInput(e.target.value))}
-                    className={FIELD_CLS}
-                  />
-                  <Button type="button" size="sm" onClick={handleApplyBulkQuantity}>
-                    {t("bulkIssuePanel.applyQuantity")}
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              title={t("bulkIssuePanel.setFull")}
+              disabled={!someChecked}
+              onClick={handleFillFull}
+            >
+              <CheckCheck className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              title={t("bulkIssuePanel.setLastReceipt")}
+              disabled={!someChecked || loadingLastReceipt}
+              onClick={handleFillLastReceipt}
+            >
+              <History className="h-4 w-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button type="button" variant="outline" size="icon-sm" title={t("bulkIssuePanel.setSameQuantity")} disabled={!someChecked}>
+                    <Equal className="h-4 w-4" />
                   </Button>
-                </div>
-              </label>
-            </PopoverContent>
-          </Popover>
-        </div>
+                }
+              />
+              <PopoverContent align="start" className="w-64">
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLS}>{t("bulkIssuePanel.setSameQuantity")}</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoFocus
+                      value={bulkQuantity}
+                      onChange={(e) => setBulkQuantity(sanitizeQuantityInput(e.target.value))}
+                      className={FIELD_CLS}
+                    />
+                    <Button type="button" size="sm" onClick={handleApplyBulkQuantity}>
+                      {t("bulkIssuePanel.applyQuantity")}
+                    </Button>
+                  </div>
+                </label>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </DialogHeader>
 
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-neutral-800">
           <Table containerClassName="max-h-[50vh] overflow-y-auto">
