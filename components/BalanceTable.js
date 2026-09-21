@@ -26,14 +26,12 @@ function itemFields(material, source) {
 const ROW_STYLE = {
   used: "bg-rose-50/60 dark:bg-rose-950/20",
   new: "bg-emerald-50/60 dark:bg-emerald-950/20",
-  changed: "bg-amber-50/70 dark:bg-amber-950/20",
   unchanged: "",
 };
 
 const STATUS_STYLE = {
   used: "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
   new: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-  changed: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
   unchanged: "bg-gray-100 text-gray-500 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
@@ -42,8 +40,8 @@ function MaterialChange({ prev, curr }) {
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
       <span className="text-gray-400 line-through decoration-1 dark:text-neutral-500">{prev}</span>
-      <span className="font-medium text-amber-600 dark:text-amber-400">&gt;</span>
-      <span className="font-semibold text-amber-700 dark:text-amber-300">{curr}</span>
+      <span className="text-gray-400 dark:text-neutral-500">&gt;</span>
+      <span className="font-medium text-gray-900 dark:text-neutral-100">{curr}</span>
     </span>
   );
 }
@@ -66,11 +64,11 @@ function materialCell(key) {
 
 // Per-drum diff between the two chosen rounds - see computeBalance() in
 // page.js. Colors mirror the old /frp app's bilans xlsx (red = used up,
-// green = new spool); amber = the material on the drum changed (shown as
-// [previous] > [current] in the material columns). Built on MaterialsTable so
+// green = new spool); a changed material on a drum is not a row/status of its
+// own - it shows as [previous] > [current] in the material columns. Built on
 // every column gets the same sort/filter UI as the rest of the app, plus a
 // multiselect ("show only these") on the Status column.
-export default function BalanceTable({ material, rows, usedCount, newCount, changedCount }) {
+export default function BalanceTable({ material, rows, usedCount, newCount }) {
   const t = useTranslations("stockBalance");
   const [search, setSearch] = useState("");
 
@@ -171,7 +169,7 @@ export default function BalanceTable({ material, rows, usedCount, newCount, chan
   return (
     <div>
       <p className="mb-3 text-sm text-gray-500 dark:text-neutral-400">
-        {t("summary", { total: rows.length, used: usedCount, new: newCount, changed: changedCount })}
+        {t("summary", { total: rows.length, used: usedCount, new: newCount })}
       </p>
       <MaterialsTable
         data={data}

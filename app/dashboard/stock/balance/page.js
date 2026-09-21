@@ -61,9 +61,9 @@ function materialSignature(material, item) {
 // logic the old /frp app used for its "bilans" xlsx (generateBalance()):
 // present in both -> compare length; only in the earlier round -> used up
 // ("zużyta"); only in the later round -> new spool ("nowa szpula"). A drum
-// present in both whose material differs is "changed" ("zmiana materiału")
-// - its earlier item is kept as `prevSource` so the table can show
-// [previous] > [current].
+// present in both whose material differs keeps its earlier item as
+// `prevSource` so the table can show [previous] > [current] in the material
+// columns (its status stays "unchanged"/length-based, no separate status).
 function computeBalance(material, fromItems, toItems) {
   const fromMap = new Map(fromItems.filter((i) => i.drumNumber).map((i) => [i.drumNumber, i]));
   const toMap = new Map(toItems.filter((i) => i.drumNumber).map((i) => [i.drumNumber, i]));
@@ -78,8 +78,7 @@ function computeBalance(material, fromItems, toItems) {
     const currMeters = currItem ? Number(currItem.length) || 0 : 0;
     const materialChanged =
       Boolean(prevItem && currItem) && materialSignature(material, prevItem) !== materialSignature(material, currItem);
-    const status =
-      prevItem && !currItem ? "used" : !prevItem && currItem ? "new" : materialChanged ? "changed" : "unchanged";
+    const status = prevItem && !currItem ? "used" : !prevItem && currItem ? "new" : "unchanged";
     return {
       drumNumber: drum,
       source: currItem ?? prevItem,
@@ -117,7 +116,6 @@ export default async function StockBalancePage({ searchParams }) {
     snapshotFrom && snapshotTo ? computeBalance(material, snapshotFrom.items, snapshotTo.items) : [];
   const usedCount = rows.filter((r) => r.status === "used").length;
   const newCount = rows.filter((r) => r.status === "new").length;
-  const changedCount = rows.filter((r) => r.status === "changed").length;
 
   return (
     <div>
@@ -153,13 +151,7 @@ export default async function StockBalancePage({ searchParams }) {
 
       <div className="mt-6">
         {rows.length > 0 ? (
-          <BalanceTable
-            material={material}
-            rows={rows}
-            usedCount={usedCount}
-            newCount={newCount}
-            changedCount={changedCount}
-          />
+          <BalanceTable material={material} rows={rows} usedCount={usedCount} newCount={newCount} />
         ) : (
           !error && <p className="text-sm text-gray-500 dark:text-neutral-400">{t("pickBothDates")}</p>
         )}
