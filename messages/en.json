@@ -104,8 +104,11 @@
       "prevKm": "Previous (km)",
       "currKm": "Current (km)",
       "delta": "Δ (km)",
+      "materialsCategory": "Category",
       "materialsItemNo": "Item no.",
       "materialsItemName": "Name",
+      "materialsUnit": "Unit",
+      "materialsRemark": "Remark",
       "materialsIndividualUnits": "Separate units",
       "materialsSpec": "Specification",
       "materialsLocation": "Location",
@@ -114,6 +117,7 @@
       "historyItemName": "Name",
       "historyOperation": "Operation",
       "historyQuantity": "Operation qty.",
+      "historyProductBatch": "Batch",
       "historyQuantityAfter": "Qty. after",
       "historyLocation": "Location",
       "historyOperator": "Handled by",
@@ -140,7 +144,8 @@
       "columns": "Columns",
       "resetColumnWidth": "Drag to resize - double-click to reset to default",
       "exportExcel": "Export",
-      "exporting": "Exporting…"
+      "exporting": "Exporting…",
+      "exportFailed": "Could not export the data."
     },
     "filters": {
       "title": "Filters",
@@ -264,10 +269,6 @@
       "cancel": "Cancel",
       "note": "Saving to the system will be available soon."
     }
-  },
-  "materialsReports": {
-    "title": "Reports",
-    "subtitle": "Materials reports will be shown here. This section is coming soon."
   },
   "ordersCip": {
     "title": "Order list",
@@ -440,29 +441,75 @@
     "empty": "No operations recorded yet. Receipts and issues from SM Materials will show up here.",
     "prevPage": "Previous",
     "nextPage": "Next",
-    "pageOf": "Page {current} of {total}"
+    "pageOf": "Page {current} of {total}",
+    "noResults": "No operations match the filters.",
+    "filters": {
+      "itemNo": "Item no.",
+      "operator": "Performed by",
+      "operation": "Operation",
+      "allOperations": "All",
+      "search": "Search",
+      "clear": "Clear"
+    }
   },
   "materialsCatalogSm": {
     "title": "SM Materials Catalog",
-    "subtitle": "Reference list of SM materials - item number and name, used to suggest a name during receipts. Add a new material here before receiving it.",
+    "subtitle": "Reference list of SM materials - category, item number, name, unit and remark, used to suggest a name during receipts. Add a new material here before receiving it.",
     "count": "Items: {count}",
     "loading": "Loading…",
     "fetchError": "Failed to fetch the catalog from the API.",
     "actions": {
       "add": "Add material",
+      "import": "Import",
       "edit": "Edit",
       "delete": "Delete",
       "save": "Save",
-      "confirmDelete": "Delete {itemNo} from the catalog?"
+      "confirmDelete": "Delete {itemNo} from the catalog?",
+      "spoolNumbering": "Spool numbering"
+    },
+    "importDialog": {
+      "title": "Import into the catalog",
+      "hint": "Choose the Excel file with the catalog (columns: Category, Item number, Item name, Unit, Remark - e.g. importKatalogu.xlsx). A new item number is added, an existing one updated.",
+      "chooseFile": "Choose an .xlsx file",
+      "reading": "Reading the file…",
+      "readError": "Could not read the file. Choose the Excel (.xlsx) catalog file.",
+      "summary": "Rows in the file: {rows}, unique items to import: {unique}.",
+      "duplicates": "Repeated item numbers ({count}) - the last row of each is used.",
+      "skipped": "Skipped rows without an item number or name: {count}.",
+      "cancel": "Cancel",
+      "save": "Import ({count})",
+      "importing": "Importing…"
+    },
+    "toast": {
+      "imported": "Import: added {created}, updated {updated}, errors {failed}."
     },
     "form": {
+      "category": "Category",
       "itemNo": "Item number",
       "itemName": "Name",
+      "unit": "Unit",
+      "remark": "Remark",
       "individualUnitsLabel": "Material split into units",
       "individualUnitsHint": "Check this if this material's quantities should be split into separate, numbered objects (e.g. spools) instead of being summed into one combined value.",
       "cancel": "Cancel",
       "required": "Enter an item number and name.",
       "duplicate": "This item number is already in the catalog."
+    },
+    "spoolNumbering": {
+      "title": "FRP spool numbering",
+      "hint": "The numbers the scanner app gives FRP spools. Series are used in order: when the numbers in the first run out, the next series takes over. A number is always one above the highest already used in its series (gaps are not filled).",
+      "nextNumber": "Next number",
+      "loading": "Loading…",
+      "loadError": "Could not load the settings.",
+      "prefix": "Prefix",
+      "digits": "Digits",
+      "from": "From",
+      "to": "To",
+      "addSeries": "Add series",
+      "remove": "Remove series",
+      "save": "Save",
+      "saving": "Saving…",
+      "close": "Close"
     }
   },
   "materialsHistory": {

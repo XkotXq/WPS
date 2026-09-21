@@ -103,7 +103,6 @@ export default function DashboardLayout({ children }) {
   const materialsChildren = [
     { href: "/dashboard/materials-list-cip", label: tNav("materialsList") },
     { href: "/dashboard/materials-list-cip/history-cip", label: tNav("materialsHistory") },
-    { href: "/dashboard/materials-list-cip/reports", label: tNav("reports") },
   ];
 
   const materialsSmChildren = [

@@ -104,8 +104,11 @@
       "prevKm": "Poprzednio (km)",
       "currKm": "Teraz (km)",
       "delta": "Δ (km)",
+      "materialsCategory": "Kategoria",
       "materialsItemNo": "Nr itemu",
       "materialsItemName": "Nazwa",
+      "materialsUnit": "Jednostka",
+      "materialsRemark": "Uwagi",
       "materialsIndividualUnits": "Osobne jednostki",
       "materialsSpec": "Specyfikacja",
       "materialsLocation": "Lokalizacja",
@@ -114,6 +117,7 @@
       "historyItemName": "Nazwa",
       "historyOperation": "Operacja",
       "historyQuantity": "Ilość operacji",
+      "historyProductBatch": "Batch",
       "historyQuantityAfter": "Stan po operacji",
       "historyLocation": "Lokalizacja",
       "historyOperator": "Wykonał",
@@ -140,7 +144,8 @@
       "columns": "Kolumny",
       "resetColumnWidth": "Przeciągnij, aby zmienić szerokość - kliknij dwukrotnie, aby przywrócić domyślną",
       "exportExcel": "Eksportuj",
-      "exporting": "Eksportowanie…"
+      "exporting": "Eksportowanie…",
+      "exportFailed": "Nie udało się wyeksportować danych."
     },
     "filters": {
       "title": "Filtry",
@@ -264,10 +269,6 @@
       "cancel": "Anuluj",
       "note": "Zapis w systemie będzie dostępny wkrótce."
     }
-  },
-  "materialsReports": {
-    "title": "Raporty",
-    "subtitle": "Tutaj pojawią się raporty materiałowe. Ta sekcja jest w przygotowaniu."
   },
   "ordersCip": {
     "title": "Lista zamówień",
@@ -440,29 +441,75 @@
     "empty": "Brak zarejestrowanych operacji. Przyjęcia i wydania z Materiałów SM będą pojawiać się tutaj.",
     "prevPage": "Poprzednia",
     "nextPage": "Następna",
-    "pageOf": "Strona {current} z {total}"
+    "pageOf": "Strona {current} z {total}",
+    "noResults": "Brak operacji pasujących do filtrów.",
+    "filters": {
+      "itemNo": "Nr itemu",
+      "operator": "Wykonał",
+      "operation": "Operacja",
+      "allOperations": "Wszystkie",
+      "search": "Szukaj",
+      "clear": "Wyczyść"
+    }
   },
   "materialsCatalogSm": {
     "title": "Katalog materiałów SM",
-    "subtitle": "Referencyjna lista materiałów SM - numer itemu i nazwa, używana do podpowiadania nazwy przy przyjęciach. Dodaj tu nowy materiał, zanim zaczniesz go przyjmować.",
+    "subtitle": "Referencyjna lista materiałów SM - kategoria, numer itemu, nazwa, jednostka i uwagi, używana do podpowiadania nazwy przy przyjęciach. Dodaj tu nowy materiał, zanim zaczniesz go przyjmować.",
     "count": "Pozycji: {count}",
     "loading": "Ładowanie…",
     "fetchError": "Nie udało się pobrać katalogu z API.",
     "actions": {
       "add": "Dodaj materiał",
+      "import": "Importuj",
       "edit": "Edytuj",
       "delete": "Usuń",
       "save": "Zapisz",
-      "confirmDelete": "Usunąć {itemNo} z katalogu?"
+      "confirmDelete": "Usunąć {itemNo} z katalogu?",
+      "spoolNumbering": "Numeracja szpul"
+    },
+    "importDialog": {
+      "title": "Import do katalogu",
+      "hint": "Wybierz plik Excel z katalogiem (kolumny: Category, Item number, Item name, Unit, Remark - np. importKatalogu.xlsx). Nowy numer itemu zostanie dodany, istniejący zaktualizowany.",
+      "chooseFile": "Wybierz plik .xlsx",
+      "reading": "Wczytywanie pliku…",
+      "readError": "Nie udało się odczytać pliku. Wybierz plik Excel (.xlsx) z katalogiem.",
+      "summary": "Wierszy w pliku: {rows}, unikalnych pozycji do zaimportowania: {unique}.",
+      "duplicates": "Powtórzone numery itemów ({count}) - zostanie użyty ostatni wiersz każdego.",
+      "skipped": "Pominięte wiersze bez numeru itemu lub nazwy: {count}.",
+      "cancel": "Anuluj",
+      "save": "Importuj ({count})",
+      "importing": "Importowanie…"
+    },
+    "toast": {
+      "imported": "Import: dodano {created}, zaktualizowano {updated}, błędów {failed}."
     },
     "form": {
+      "category": "Kategoria",
       "itemNo": "Nr itemu",
       "itemName": "Nazwa",
+      "unit": "Jednostka",
+      "remark": "Uwagi",
       "individualUnitsLabel": "Materiał rozdzielony na jednostki",
       "individualUnitsHint": "Zaznacz, jeśli ilości tego materiału mają być rozdzielone na osobne, numerowane obiekty (np. szpule) zamiast sumować się w jedną łączną wartość.",
       "cancel": "Anuluj",
       "required": "Podaj numer itemu i nazwę.",
       "duplicate": "Ten numer itemu już jest w katalogu."
+    },
+    "spoolNumbering": {
+      "title": "Numeracja szpul FRP",
+      "hint": "Numery, które aplikacja na skanerze nadaje szpulom FRP. Zakresy są używane po kolei: gdy numery w pierwszym się skończą, następne dostaje kolejny zakres. Numer jest zawsze o jeden większy od największego już użytego w zakresie (luk nie wypełnia).",
+      "nextNumber": "Następny numer",
+      "loading": "Wczytywanie…",
+      "loadError": "Nie udało się pobrać ustawień.",
+      "prefix": "Prefiks",
+      "digits": "Cyfr",
+      "from": "Od",
+      "to": "Do",
+      "addSeries": "Dodaj zakres",
+      "remove": "Usuń zakres",
+      "save": "Zapisz",
+      "saving": "Zapisywanie…",
+      "close": "Zamknij"
     }
   },
   "materialsHistory": {

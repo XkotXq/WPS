@@ -116,6 +116,11 @@ export default function MaterialsTable({
   // (e.g. MaterialBreakdownSection's card) - there, bleeding would blow
   // past that container's own border instead of the page's.
   bleed = true,
+  // For a table that only holds one page of a longer list (see
+  // SmMaterialsHistoryTable): async () => every row of the whole list, in the
+  // same shape as `data`. The Excel export then writes those instead of just
+  // the rows on screen (the visible columns still apply).
+  loadAllRowsForExport,
 }) {
   const tColumns = useTranslations("stock.columns");
   const tStock = useTranslations("stock");
@@ -356,18 +361,31 @@ export default function MaterialsTable({
   // Exports exactly what's on screen right now: visible columns in their
   // current order (respects the "Kolumny" toggle), and whichever rows
   // getRowModel() currently returns (respects filters, sorting, and
-  // showOnlySelected) - not a separate "export everything" path.
+  // showOnlySelected) - unless the caller gave `loadAllRowsForExport`, then
+  // the rows come from there (the whole list, not the on-screen page).
   const [exporting, setExporting] = useState(false);
   async function exportToExcel() {
+    setExporting(true);
+    try {
+      const sourceRows = loadAllRowsForExport ? await loadAllRowsForExport() : visibleRows.map((row) => row.original);
+      await writeExcel(sourceRows);
+    } catch {
+      window.alert(tActions("exportFailed"));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function writeExcel(sourceRows) {
     const exportColumns = table.getVisibleLeafColumns().filter((col) => col.id !== "select" && col.id !== "actions");
     const headers = exportColumns.map((col) => {
       const config = columnConfig.find((c) => c.key === col.id);
       return config ? columnLabel(config) : col.id;
     });
-    const rows = visibleRows.map((row) =>
+    const rows = sourceRows.map((original) =>
       exportColumns.map((col) => {
         const config = columnConfig.find((c) => c.key === col.id);
-        const value = row.original[col.id];
+        const value = original[col.id];
         if (config?.type === "boolean") return value ? tColumns("yes") : tColumns("no");
         if (config?.type === "datetime") {
           const date = new Date(value);
@@ -381,12 +399,7 @@ export default function MaterialsTable({
     const pad = (v) => String(v).padStart(2, "0");
     const now = new Date();
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
-    setExporting(true);
-    try {
-      await downloadStockXlsx({ fileName: `eksport_${timestamp}.xlsx`, sheets: [{ sheetName: "Dane", headers, rows }] });
-    } finally {
-      setExporting(false);
-    }
+    await downloadStockXlsx({ fileName: `eksport_${timestamp}.xlsx`, sheets: [{ sheetName: "Dane", headers, rows }] });
   }
 
   // Distinguishes *why* the table is empty - a genuinely empty dataset
