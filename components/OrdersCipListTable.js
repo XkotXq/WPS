@@ -5,7 +5,10 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import FrpFilters from "@/components/FrpFilters";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ORDERS_CIP_SEED } from "@/lib/ordersCipSeed";
+
+const STATUS_TABS = ["new", "inProgress", "done", "cancelled"];
 
 const STATUS_STYLES = {
   new: "bg-navy-50 text-navy-700 dark:bg-navy-500/15 dark:text-navy-300",
@@ -46,12 +49,15 @@ export default function OrdersCipListTable() {
   const t = useTranslations("ordersCip");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState({});
+  const [statusTab, setStatusTab] = useState(STATUS_TABS[0]);
 
   function toggle(orderNo) {
     setExpanded((prev) => ({ ...prev, [orderNo]: !prev[orderNo] }));
   }
 
-  const orders = useMemo(() => {
+  // The search runs across every status, so each tab's badge shows how many
+  // matches it holds - the table below then only lists the active tab's.
+  const searched = useMemo(() => {
     if (!search) return ORDERS_CIP_SEED;
     const needle = search.toLowerCase();
     return ORDERS_CIP_SEED.filter((order) =>
@@ -61,9 +67,26 @@ export default function OrdersCipListTable() {
     );
   }, [search, t]);
 
+  const countByStatus = useMemo(
+    () => Object.fromEntries(STATUS_TABS.map((status) => [status, searched.filter((o) => o.status === status).length])),
+    [searched]
+  );
+  const orders = useMemo(() => searched.filter((o) => o.status === statusTab), [searched, statusTab]);
+
   return (
     <div>
-      <p className="text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: orders.length })}</p>
+      <Tabs value={statusTab} onValueChange={setStatusTab}>
+        <TabsList>
+          {STATUS_TABS.map((status) => (
+            <TabsTrigger key={status} value={status}>
+              {t(`status.${status}`)}
+              <span className="ml-1.5 tabular-nums text-xs text-gray-400 dark:text-neutral-500">{countByStatus[status]}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      <p className="mt-4 text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: orders.length })}</p>
 
       <div className="mt-4">
         <FrpFilters onGlobalFilterChange={setSearch} />
@@ -82,6 +105,13 @@ export default function OrdersCipListTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {orders.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
+                    {t("emptyStatus")}
+                  </TableCell>
+                </TableRow>
+              )}
               {orders.map((order) => {
                 const isOpen = Boolean(expanded[order.orderNo]);
                 return (
