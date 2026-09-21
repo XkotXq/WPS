@@ -39,6 +39,7 @@ export default function MaterialTrendChart({ title, points }) {
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
               axisLine={{ stroke: "var(--border)" }}
               tickLine={false}
+              minTickGap={24}
             />
             <YAxis
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
@@ -49,12 +50,12 @@ export default function MaterialTrendChart({ title, points }) {
             />
             <Tooltip content={<TrendTooltip unitLabel="km" />} cursor={{ stroke: "var(--border)" }} />
             <Area
-              type="monotone"
+              type="stepAfter"
               dataKey="totalKm"
               stroke="var(--primary)"
               strokeWidth={2}
               fill="url(#materialTrendFill)"
-              dot={{ r: 4, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
+              dot={{ r: 3, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
               activeDot={{ r: 5 }}
             />
           </AreaChart>

@@ -52,6 +52,7 @@ export default function MaterialDrumCountChart({ title, points, series }) {
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
               axisLine={{ stroke: "var(--border)" }}
               tickLine={false}
+              minTickGap={24}
             />
             <YAxis
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
@@ -80,7 +81,7 @@ export default function MaterialDrumCountChart({ title, points, series }) {
             {series.map((s) => (
               <Area
                 key={s.key}
-                type="monotone"
+                type="stepAfter"
                 dataKey={s.key}
                 name={s.name}
                 stroke={s.color}
@@ -88,7 +89,7 @@ export default function MaterialDrumCountChart({ title, points, series }) {
                 fill={s.color}
                 fillOpacity={0.1}
                 hide={hidden.has(s.key)}
-                dot={{ r: 4, fill: s.color, stroke: "var(--card)", strokeWidth: 2 }}
+                dot={{ r: 3, fill: s.color, stroke: "var(--card)", strokeWidth: 2 }}
                 activeDot={{ r: 5 }}
               />
             ))}

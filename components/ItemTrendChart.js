@@ -42,6 +42,7 @@ export default function ItemTrendChart({ item, dateColumns }) {
             tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={false}
+            minTickGap={24}
           />
           <YAxis
             tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
@@ -52,12 +53,12 @@ export default function ItemTrendChart({ item, dateColumns }) {
           />
           <Tooltip content={<TrendTooltip />} cursor={{ stroke: "var(--border)" }} />
           <Area
-            type="monotone"
+            type="stepAfter"
             dataKey="km"
             stroke="var(--primary)"
             strokeWidth={2}
             fill="url(#itemTrendFill)"
-            dot={{ r: 4, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
+            dot={{ r: 3, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
             activeDot={{ r: 5 }}
           />
         </AreaChart>

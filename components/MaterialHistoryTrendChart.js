@@ -59,7 +59,7 @@ export default function MaterialHistoryTrendChart({ data }) {
           />
           <Tooltip content={<TrendTooltip />} cursor={{ stroke: "var(--border)" }} />
           <Area
-            type="monotone"
+            type="stepAfter"
             dataKey="qty"
             stroke="var(--primary)"
             strokeWidth={2}
