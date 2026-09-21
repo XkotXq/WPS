@@ -113,6 +113,7 @@ export default function DashboardLayout({ children }) {
 
   const ordersCipChildren = [
     { href: "/dashboard/orders/cip", label: tNav("ordersCipList") },
+    { href: "/dashboard/orders/cip/guidelines", label: tNav("ordersCipGuidelines") },
     { href: "/dashboard/orders/cip/history", label: tNav("ordersCipHistory") },
     { href: "/dashboard/orders/cip/reports", label: tNav("reports") },
   ];

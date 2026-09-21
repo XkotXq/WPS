@@ -29,6 +29,7 @@
     "materialsCatalogSm": "SM Materials Catalog",
     "ordersCip": "Orders",
     "ordersCipList": "Order list",
+    "ordersCipGuidelines": "Order guidelines",
     "ordersCipHistory": "Order history",
     "ordersWms": "WMS Issues",
     "ordersWmsLists": "Issue lists",
@@ -289,6 +290,10 @@
       "done": "Completed",
       "cancelled": "Cancelled"
     }
+  },
+  "ordersCipGuidelines": {
+    "title": "Order guidelines",
+    "subtitle": "Guidelines for placing orders will appear here. This section is coming soon."
   },
   "ordersCipHistory": {
     "title": "Order history",

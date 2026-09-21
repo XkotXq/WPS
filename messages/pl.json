@@ -29,6 +29,7 @@
     "materialsCatalogSm": "Katalog materiałów SM",
     "ordersCip": "Zamówienia",
     "ordersCipList": "Lista zamówień",
+    "ordersCipGuidelines": "Wytyczne do zamówień",
     "ordersCipHistory": "Historia zamówień",
     "ordersWms": "Wydania WMS",
     "ordersWmsLists": "Listy wydań",
@@ -289,6 +290,10 @@
       "done": "Zrealizowane",
       "cancelled": "Anulowane"
     }
+  },
+  "ordersCipGuidelines": {
+    "title": "Wytyczne do zamówień",
+    "subtitle": "Tutaj pojawią się wytyczne dotyczące składania zamówień. Ta sekcja jest w przygotowaniu."
   },
   "ordersCipHistory": {
     "title": "Historia zamówień",
