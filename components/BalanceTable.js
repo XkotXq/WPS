@@ -66,7 +66,8 @@ function materialCell(key) {
 // page.js. Colors mirror the old /frp app's bilans xlsx (red = used up,
 // green = new spool); a changed material on a drum is not a row/status of its
 // own - it shows as [previous] > [current] in the material columns. Built on
-// every column gets the same sort/filter UI as the rest of the app, plus a
+// MaterialsTable so every column gets the same sort/filter UI as the rest of
+// the app, plus a
 // multiselect ("show only these") on the Status column.
 export default function BalanceTable({ material, rows, usedCount, newCount }) {
   const t = useTranslations("stockBalance");
