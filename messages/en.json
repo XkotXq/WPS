@@ -191,7 +191,7 @@
     "notEnoughData": "Need at least two stocks for this material.",
     "pickBothDates": "Pick both dates to see the balance.",
     "fetchError": "Failed to fetch data from the API.",
-    "summary": "Total drums: {total} · used up: {used} · new: {new}",
+    "summary": "Total drums: {total} · used up: {used} · new: {new} · material changed: {changed}",
     "columnItem": "Item",
     "columnDrum": "Drum no.",
     "columnPrev": "Previous (km)",
@@ -201,6 +201,7 @@
     "status": {
       "used": "Used up",
       "new": "New spool",
+      "changed": "Material changed",
       "unchanged": "Unchanged"
     }
   },

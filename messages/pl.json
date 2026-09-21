@@ -191,7 +191,7 @@
     "notEnoughData": "Potrzeba co najmniej dwóch stocków dla tego materiału.",
     "pickBothDates": "Wybierz obie daty, aby zobaczyć bilans.",
     "fetchError": "Nie udało się pobrać danych z API.",
-    "summary": "Szpul łącznie: {total} · zużytych: {used} · nowych: {new}",
+    "summary": "Szpul łącznie: {total} · zużytych: {used} · nowych: {new} · zmiana materiału: {changed}",
     "columnItem": "Item",
     "columnDrum": "Nr szpuli",
     "columnPrev": "Poprzednio (km)",
@@ -201,6 +201,7 @@
     "status": {
       "used": "Zużyta",
       "new": "Nowa szpula",
+      "changed": "Zmiana materiału",
       "unchanged": "Bez zmian"
     }
   },

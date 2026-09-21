@@ -46,11 +46,25 @@ async function loadSnapshot(session, material) {
   }
 }
 
+// What a spool is "made of" in a snapshot - the fields that identify the
+// material itself (not its length/location/remark). A drum number can carry
+// different material in two rounds: the same physical spool re-used, e.g.
+// filler gray 2.1 in one stock and gray 1.5 in the next.
+function materialSignature(material, item) {
+  const norm = (value) => String(value ?? "").trim().toLowerCase();
+  if (material === "frp") return norm(item.itemNumber || item.frpNumber);
+  if (material === "coatedFrp") return `${norm(item.diameter)}|${norm(item.type)}`;
+  return `${norm(item.diameter)}|${norm(item.color)}`;
+}
+
 // Per-drum diff between two chosen rounds - matched by drum number, same
 // logic the old /frp app used for its "bilans" xlsx (generateBalance()):
 // present in both -> compare length; only in the earlier round -> used up
-// ("zużyta"); only in the later round -> new spool ("nowa szpula").
-function computeBalance(fromItems, toItems) {
+// ("zużyta"); only in the later round -> new spool ("nowa szpula"). A drum
+// present in both whose material differs is "changed" ("zmiana materiału")
+// - its earlier item is kept as `prevSource` so the table can show
+// [previous] > [current].
+function computeBalance(material, fromItems, toItems) {
   const fromMap = new Map(fromItems.filter((i) => i.drumNumber).map((i) => [i.drumNumber, i]));
   const toMap = new Map(toItems.filter((i) => i.drumNumber).map((i) => [i.drumNumber, i]));
   const drums = [...new Set([...fromMap.keys(), ...toMap.keys()])].sort((a, b) =>
@@ -62,10 +76,15 @@ function computeBalance(fromItems, toItems) {
     const currItem = toMap.get(drum) ?? null;
     const prevMeters = prevItem ? Number(prevItem.length) || 0 : 0;
     const currMeters = currItem ? Number(currItem.length) || 0 : 0;
-    const status = prevItem && !currItem ? "used" : !prevItem && currItem ? "new" : "unchanged";
+    const materialChanged =
+      Boolean(prevItem && currItem) && materialSignature(material, prevItem) !== materialSignature(material, currItem);
+    const status =
+      prevItem && !currItem ? "used" : !prevItem && currItem ? "new" : materialChanged ? "changed" : "unchanged";
     return {
       drumNumber: drum,
       source: currItem ?? prevItem,
+      prevSource: materialChanged ? prevItem : null,
+      materialChanged,
       prevKm: prevItem ? prevMeters / 1000 : null,
       currKm: currItem ? currMeters / 1000 : null,
       deltaKm: (currMeters - prevMeters) / 1000,
@@ -95,9 +114,10 @@ export default async function StockBalancePage({ searchParams }) {
   const error = sessionsError || fromError || toError;
 
   const rows =
-    snapshotFrom && snapshotTo ? computeBalance(snapshotFrom.items, snapshotTo.items) : [];
+    snapshotFrom && snapshotTo ? computeBalance(material, snapshotFrom.items, snapshotTo.items) : [];
   const usedCount = rows.filter((r) => r.status === "used").length;
   const newCount = rows.filter((r) => r.status === "new").length;
+  const changedCount = rows.filter((r) => r.status === "changed").length;
 
   return (
     <div>
@@ -133,7 +153,13 @@ export default async function StockBalancePage({ searchParams }) {
 
       <div className="mt-6">
         {rows.length > 0 ? (
-          <BalanceTable material={material} rows={rows} usedCount={usedCount} newCount={newCount} />
+          <BalanceTable
+            material={material}
+            rows={rows}
+            usedCount={usedCount}
+            newCount={newCount}
+            changedCount={changedCount}
+          />
         ) : (
           !error && <p className="text-sm text-gray-500 dark:text-neutral-400">{t("pickBothDates")}</p>
         )}

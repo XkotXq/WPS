@@ -26,53 +26,100 @@ function itemFields(material, source) {
 const ROW_STYLE = {
   used: "bg-rose-50/60 dark:bg-rose-950/20",
   new: "bg-emerald-50/60 dark:bg-emerald-950/20",
+  changed: "bg-amber-50/70 dark:bg-amber-950/20",
   unchanged: "",
 };
 
 const STATUS_STYLE = {
   used: "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
   new: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+  changed: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
   unchanged: "bg-gray-100 text-gray-500 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
+// The material on a drum changed between the two rounds: [previous] > [current].
+function MaterialChange({ prev, curr }) {
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+      <span className="text-gray-400 line-through decoration-1 dark:text-neutral-500">{prev}</span>
+      <span className="font-medium text-amber-600 dark:text-amber-400">&gt;</span>
+      <span className="font-semibold text-amber-700 dark:text-amber-300">{curr}</span>
+    </span>
+  );
+}
+
+// Cell for a column that identifies the material (item / diameter / color /
+// XBZ). `r[key]` is what the table currently shows (the full value, or the
+// short one when the column's "simplified" toggle is on - see
+// MaterialsTable); `r[`${key}Full`]` is always the full value, so comparing
+// the two says which of the previous value's variants to show next to it.
+function materialCell(key) {
+  return (r) => {
+    const curr = r[key];
+    if (!r.materialChanged) return curr;
+    const simplified = r[`${key}Full`] !== curr;
+    const prev = simplified ? r[`prev_${key}Short`] || r[`prev_${key}`] : r[`prev_${key}`];
+    if (!prev || prev === curr) return curr;
+    return <MaterialChange prev={prev} curr={curr} />;
+  };
+}
+
 // Per-drum diff between the two chosen rounds - see computeBalance() in
 // page.js. Colors mirror the old /frp app's bilans xlsx (red = used up,
-// green = new spool). Built on MaterialsTable so every column gets the
-// same sort/filter UI as the rest of the app, plus a multiselect ("show
-// only these") on the Status column.
-export default function BalanceTable({ material, rows, usedCount, newCount }) {
+// green = new spool); amber = the material on the drum changed (shown as
+// [previous] > [current] in the material columns). Built on MaterialsTable so
+// every column gets the same sort/filter UI as the rest of the app, plus a
+// multiselect ("show only these") on the Status column.
+export default function BalanceTable({ material, rows, usedCount, newCount, changedCount }) {
   const t = useTranslations("stockBalance");
   const [search, setSearch] = useState("");
 
-  const data = rows.map((row) => ({
-    id: row.drumNumber,
-    ...itemFields(material, row.source),
-    drumNumber: row.drumNumber,
-    prevKm: row.prevKm ?? 0,
-    hasPrev: row.prevKm !== null,
-    currKm: row.currKm ?? 0,
-    hasCurr: row.currKm !== null,
-    deltaKm: row.deltaKm,
-    status: row.status,
-    statusLabel: t(`status.${row.status}`),
-  }));
+  const data = rows.map((row) => {
+    const current = itemFields(material, row.source);
+    const previous = itemFields(material, row.prevSource);
+    return {
+      id: row.drumNumber,
+      ...current,
+      itemFull: current.item,
+      diameterFull: current.diameter,
+      colorFull: current.color,
+      xbzFull: current.xbz,
+      // Only meaningful when materialChanged - the earlier round's values.
+      prev_item: previous.item,
+      prev_itemShort: previous.itemShort,
+      prev_diameter: previous.diameter,
+      prev_diameterShort: previous.diameterShort,
+      prev_color: previous.color,
+      prev_xbz: previous.xbz,
+      materialChanged: row.materialChanged,
+      drumNumber: row.drumNumber,
+      prevKm: row.prevKm ?? 0,
+      hasPrev: row.prevKm !== null,
+      currKm: row.currKm ?? 0,
+      hasCurr: row.currKm !== null,
+      deltaKm: row.deltaKm,
+      status: row.status,
+      statusLabel: t(`status.${row.status}`),
+    };
+  });
 
   const columns = [
     ...(material === "frp"
-      ? [{ key: "item", headerKey: "item", filterFn: "multiselect", sortable: true, simpleKey: "itemShort" }]
+      ? [{ key: "item", headerKey: "item", filterFn: "multiselect", sortable: true, simpleKey: "itemShort", render: materialCell("item") }]
       : []),
     ...(material === "filler"
-      ? [{ key: "color", headerKey: "color", filterFn: "multiselect", sortable: true }]
+      ? [{ key: "color", headerKey: "color", filterFn: "multiselect", sortable: true, render: materialCell("color") }]
       : []),
     {
       key: "diameter",
       headerKey: "diameter",
       filterFn: "multiselect",
       sortable: true,
+      render: materialCell("diameter"),
       ...(material === "frp" && { simpleKey: "diameterShort" }),
     },
     ...(material === "coatedFrp"
-      ? [{ key: "xbz", headerKey: "xbz", filterFn: "includesString", sortable: true }]
+      ? [{ key: "xbz", headerKey: "xbz", filterFn: "includesString", sortable: true, render: materialCell("xbz") }]
       : []),
     { key: "drumNumber", headerKey: "spoolNumber", filterFn: "includesString", sortable: true },
     {
@@ -124,7 +171,7 @@ export default function BalanceTable({ material, rows, usedCount, newCount }) {
   return (
     <div>
       <p className="mb-3 text-sm text-gray-500 dark:text-neutral-400">
-        {t("summary", { total: rows.length, used: usedCount, new: newCount })}
+        {t("summary", { total: rows.length, used: usedCount, new: newCount, changed: changedCount })}
       </p>
       <MaterialsTable
         data={data}
