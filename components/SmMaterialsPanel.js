@@ -1585,6 +1585,12 @@ export default function SmMaterialsPanel() {
   const [itemNoQuery, setItemNoQuery] = useState("");
   const [itemNameQuery, setItemNameQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
+  // What's typed in the three boxes but not applied yet - "Szukaj" copies
+  // them into the *Query states above (which filteredItems reads) and
+  // refetches the list from the API, so a search always runs on current data.
+  const [itemNoDraft, setItemNoDraft] = useState("");
+  const [itemNameDraft, setItemNameDraft] = useState("");
+  const [locationDraft, setLocationDraft] = useState("");
   // Table filters: narrow the already-loaded items.
   const [columnFilters, setColumnFilters] = useState({ note: "", quantityMin: "", quantityMax: "" });
   // itemName is a bounded catalog field (same materials list, same shape as
@@ -2248,6 +2254,15 @@ export default function SmMaterialsPanel() {
     );
   }
 
+  function handleSearch(event) {
+    event.preventDefault();
+    setItemNoQuery(itemNoDraft);
+    setItemNameQuery(itemNameDraft);
+    setLocationQuery(locationDraft);
+    setRefreshing(true);
+    loadItems().finally(() => setRefreshing(false));
+  }
+
   function handleRefresh() {
     setRefreshing(true);
     loadItems().finally(() => setRefreshing(false));
@@ -2292,32 +2307,36 @@ export default function SmMaterialsPanel() {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-1 flex-wrap items-center gap-2">
+        <form onSubmit={handleSearch} className="flex flex-1 flex-wrap items-center gap-2">
           <div className="relative w-44">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-neutral-500" />
             <input
               type="text"
-              value={itemNoQuery}
-              onChange={(e) => setItemNoQuery(e.target.value)}
+              value={itemNoDraft}
+              onChange={(e) => setItemNoDraft(e.target.value)}
               placeholder={t("columns.itemNo")}
               className="h-9 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 pl-9 pr-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
             />
           </div>
           <input
             type="text"
-            value={itemNameQuery}
-            onChange={(e) => setItemNameQuery(e.target.value)}
+            value={itemNameDraft}
+            onChange={(e) => setItemNameDraft(e.target.value)}
             placeholder={t("columns.itemName")}
             className="h-9 w-52 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
           />
           <input
             type="text"
-            value={locationQuery}
-            onChange={(e) => setLocationQuery(e.target.value)}
+            value={locationDraft}
+            onChange={(e) => setLocationDraft(e.target.value)}
             placeholder={t("columns.location")}
             className="h-9 w-36 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400"
           />
-        </div>
+          <Button type="submit" size="sm" className="gap-1.5 px-3.5 font-semibold" disabled={refreshing}>
+            <Search className="h-4 w-4" />
+            {t("search")}
+          </Button>
+        </form>
         <div className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 p-1">
           <button
             type="button"

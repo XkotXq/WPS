@@ -307,6 +307,7 @@
     "fetchError": "Nie udało się pobrać listy z API.",
     "empty": "Brak materiałów. Użyj przycisku „Przyjęcie”, aby dodać pierwszy.",
     "addReceipt": "Przyjęcie",
+    "search": "Szukaj",
     "refresh": "Odśwież",
     "dataAsOf": "Dane z {time}",
     "prevPage": "Poprzednia",
