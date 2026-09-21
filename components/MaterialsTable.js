@@ -441,7 +441,7 @@ export default function MaterialsTable({
                     key={header.id}
                     data-column-id={header.column.id}
                     style={resizedWidth ? { width: resizedWidth, minWidth: resizedWidth, maxWidth: resizedWidth } : undefined}
-                    className={`sticky top-0 h-11 bg-gray-50 px-4 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:bg-neutral-800 dark:text-neutral-400 ${
+                    className={`sticky top-0 bg-gray-50 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:bg-neutral-800 dark:text-neutral-500 ${
                       bleed ? "first:pl-8 last:pr-8" : ""
                     } ${
                       isActionsCol ? "right-0 z-20 border-l border-gray-200 dark:border-neutral-700" : "z-10"
@@ -529,7 +529,7 @@ export default function MaterialsTable({
         </TableHeader>
         <TableBody>
           {emptyMessage ? (
-            <TableRow className="border-gray-100 dark:border-neutral-800">
+            <TableRow>
               <TableCell
                 colSpan={table.getVisibleLeafColumns().length}
                 className="px-4 py-8 text-center text-sm text-gray-500 dark:text-neutral-400"
@@ -561,7 +561,7 @@ export default function MaterialsTable({
                 key={row.id}
                 data-state={isSelected ? "selected" : undefined}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                className={`group border-gray-100 dark:border-neutral-800 ${onRowClick ? "cursor-pointer" : ""} ${stripeCls}`}
+                className={`group ${onRowClick ? "cursor-pointer" : ""} ${stripeCls}`}
               >
                 {row.getVisibleCells().map((cell) => {
                   const config = columnConfig.find((c) => c.key === cell.column.id);
@@ -571,7 +571,7 @@ export default function MaterialsTable({
                     <TableCell
                       key={cell.id}
                       style={resizedWidth ? { width: resizedWidth, minWidth: resizedWidth, maxWidth: resizedWidth } : undefined}
-                      className={`px-4 py-2.5 text-gray-700 dark:text-neutral-300 ${bleed ? "first:pl-8 last:pr-8" : ""} ${
+                      className={`text-gray-600 dark:text-neutral-300 ${bleed ? "first:pl-8 last:pr-8" : ""} ${
                         isActionsCol
                           ? `sticky right-0 z-10 border-l border-gray-100 dark:border-neutral-800 ${stickyBgCls} group-hover:!bg-gray-100 dark:group-hover:!bg-neutral-700`
                           : resizedWidth
