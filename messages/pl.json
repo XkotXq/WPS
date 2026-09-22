@@ -290,6 +290,18 @@
       "inProgress": "W realizacji",
       "done": "Zrealizowane",
       "cancelled": "Anulowane"
+    },
+    "newOrderPanel": {
+      "trigger": "Zamów",
+      "title": "Nowe zamówienie",
+      "lineLabel": "Linia",
+      "linePlaceholder": "Wybierz linię",
+      "addItemLabel": "Dodaj materiał",
+      "addItemPlaceholder": "Szukaj po numerze lub nazwie...",
+      "noMatches": "Brak wyników",
+      "removeRow": "Usuń pozycję",
+      "cancel": "Anuluj",
+      "save": "Złóż zamówienie"
     }
   },
   "ordersCipGuidelines": {

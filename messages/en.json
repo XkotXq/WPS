@@ -290,6 +290,18 @@
       "inProgress": "In progress",
       "done": "Completed",
       "cancelled": "Cancelled"
+    },
+    "newOrderPanel": {
+      "trigger": "Order",
+      "title": "New order",
+      "lineLabel": "Line",
+      "linePlaceholder": "Select a line",
+      "addItemLabel": "Add material",
+      "addItemPlaceholder": "Search by number or name...",
+      "noMatches": "No matches",
+      "removeRow": "Remove row",
+      "cancel": "Cancel",
+      "save": "Place order"
     }
   },
   "ordersCipGuidelines": {
