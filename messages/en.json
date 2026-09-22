@@ -275,7 +275,7 @@
     "title": "Order list",
     "subtitle": "Orders placed to the main warehouse. Demo data - CIP integration is coming soon.",
     "count": "Items: {count}",
-    "emptyStatus": "No orders with this status.",
+    "emptyStatus": "No orders match the search.",
     "columns": {
       "orderNo": "Order number",
       "status": "Status",

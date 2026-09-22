@@ -275,7 +275,7 @@
     "title": "Lista zamówień",
     "subtitle": "Zamówienia złożone do magazynu głównego. Dane demonstracyjne - integracja z CIP jest w przygotowaniu.",
     "count": "Pozycji: {count}",
-    "emptyStatus": "Brak zamówień w tym statusie.",
+    "emptyStatus": "Brak zamówień spełniających kryteria wyszukiwania.",
     "columns": {
       "orderNo": "Numer zamówienia",
       "status": "Status",
