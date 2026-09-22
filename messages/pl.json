@@ -280,7 +280,7 @@
       "orderNo": "Numer zamówienia",
       "status": "Status",
       "line": "Linia",
-      "employeeNo": "Nr pracownika",
+      "employeeNo": "Zamawiający",
       "createdAt": "Data utworzenia",
       "note": "Notatka"
     },

@@ -280,7 +280,7 @@
       "orderNo": "Order number",
       "status": "Status",
       "line": "Line",
-      "employeeNo": "Employee no.",
+      "employeeNo": "Ordered by",
       "createdAt": "Created at",
       "note": "Note"
     },
