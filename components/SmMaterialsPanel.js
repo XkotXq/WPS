@@ -143,6 +143,15 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateAggregate, onR
   const [unitId, setUnitId] = useState("");
   const [receiveMode, setReceiveMode] = useState("single");
   const [bulkRows, setBulkRows] = useState(() => [newBulkReceiveRow(), newBulkReceiveRow(), newBulkReceiveRow()]);
+  // What resolveItemNo last fetched *straight from the API* for this exact
+  // itemNo - current stock first, then the catalog, same order/sources as
+  // isIndividuallyTracked/lookupItemName below, but read fresh instead of
+  // from `items`/`catalog` (a snapshot from whenever this page happened to
+  // load, which can go stale under someone else's edit elsewhere). null
+  // itemName here (item genuinely doesn't exist) is distinguished from
+  // "not resolved yet" by resolved itself being non-null.
+  const [resolved, setResolved] = useState(null);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -152,7 +161,44 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateAggregate, onR
     setUnitId("");
     setReceiveMode("single");
     setBulkRows([newBulkReceiveRow(), newBulkReceiveRow(), newBulkReceiveRow()]);
+    setResolved(null);
   }, [open]);
+
+  // Fired on leaving the Nr itemu field - a fresh, authoritative read of
+  // what this item actually is right now, rather than trusting `items`/
+  // `catalog` (loaded once when the page opened). A failed request (API
+  // unreachable) just leaves `resolved` as it was - the fields below fall
+  // back to the local lookup, same as before this existed.
+  async function resolveItemNo(rawItemNo) {
+    const trimmed = rawItemNo.trim();
+    if (!trimmed) {
+      setResolved(null);
+      return;
+    }
+    setResolving(true);
+    try {
+      const stockItem = await smItemsApi.get(trimmed);
+      if (stockItem) {
+        setResolved({ itemNo: trimmed, itemName: stockItem.itemName, trackedIndividually: Boolean(stockItem.trackedIndividually) });
+        return;
+      }
+      const catalogItem = await smCatalogApi.get(trimmed);
+      setResolved({
+        itemNo: trimmed,
+        itemName: catalogItem?.itemName,
+        trackedIndividually: Boolean(catalogItem?.individualUnits),
+      });
+    } catch {
+      // Leave `resolved` as-is (stale or null) - the local fallback below covers it.
+    } finally {
+      setResolving(false);
+    }
+  }
+  // Only trusted while it's actually an answer for the itemNo on screen
+  // right now - once the operator types past it without blurring again,
+  // it's for a different item and the local (instant, if stale) lookup
+  // takes back over until the next blur resolves this one too.
+  const resolvedForCurrent = resolved && resolved.itemNo.toLowerCase() === itemNo.trim().toLowerCase() ? resolved : null;
 
   // Whether the currently-typed item number is individually tracked (only
   // plain FRP is, see sm_catalog) - checked against current stock first
@@ -170,13 +216,14 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateAggregate, onR
     const catalogMatch = catalog.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
     return Boolean(catalogMatch?.individualUnits);
   }
-  const needsSpoolId = isIndividuallyTracked(itemNo);
+  const needsSpoolId = resolvedForCurrent ? resolvedForCurrent.trackedIndividually : isIndividuallyTracked(itemNo);
   // Not user-editable (see the itemName field below) - always whatever
   // itemNo currently resolves to (current stock first, then the reference
-  // catalog - see lookupItemName). Blank itemNo, or one that matches
-  // nothing, means blank itemName - handleSubmit's own guard blocks the
-  // receipt until it resolves to a real material.
-  const itemName = lookupItemName(itemNo) ?? "";
+  // catalog - see lookupItemName, or resolvedForCurrent once the field's
+  // been left once). Blank itemNo, or one that matches nothing, means
+  // blank itemName - handleSubmit's own guard blocks the receipt until it
+  // resolves to a real material.
+  const itemName = (resolvedForCurrent ? resolvedForCurrent.itemName : lookupItemName(itemNo)) ?? "";
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -336,10 +383,18 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateAggregate, onR
               {t("receivePanel.itemNoLabel")}
               <RequiredMark />
             </span>
-            <input className={FIELD_CLS} value={itemNo} onChange={(e) => setItemNo(e.target.value)} />
+            <input
+              className={FIELD_CLS}
+              value={itemNo}
+              onChange={(e) => setItemNo(e.target.value)}
+              onBlur={(e) => resolveItemNo(e.target.value)}
+            />
           </label>
           <label className="flex flex-col gap-1">
-            <span className={LABEL_CLS}>{t("receivePanel.itemNameLabel")}</span>
+            <span className={LABEL_CLS}>
+              {t("receivePanel.itemNameLabel")}
+              {resolving && <span className="ml-1.5 font-normal text-gray-400 dark:text-neutral-500">{t("receivePanel.resolving")}</span>}
+            </span>
             <input className={FIELD_CLS} value={itemName} disabled />
           </label>
           <label className="flex flex-col gap-1">

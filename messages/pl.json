@@ -384,6 +384,7 @@
       "title": "Przyjęcie materiału",
       "itemNoLabel": "Numer itemu",
       "itemNameLabel": "Nazwa materiału",
+      "resolving": "(sprawdzanie…)",
       "quantityLabel": "Ilość",
       "locationLabel": "Lokalizacja",
       "unitIdLabel": "Numer szpuli (opcjonalnie)",

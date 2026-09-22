@@ -383,6 +383,7 @@
     "receivePanel": {
       "title": "Material receipt",
       "itemNoLabel": "Item number",
+      "resolving": "(checking…)",
       "itemNameLabel": "Material name",
       "quantityLabel": "Quantity",
       "locationLabel": "Location",
