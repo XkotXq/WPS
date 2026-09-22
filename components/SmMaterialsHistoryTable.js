@@ -2,15 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MaterialsTable from "@/components/MaterialsTable";
 import { smOperationsApi } from "@/lib/smItemsApi";
 
 // Same look as the filter row on Lista materiałów SM (SmMaterialsPanel.js).
 const inputClasses =
   "h-9 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 text-sm text-gray-900 dark:text-neutral-100 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400";
-const EMPTY_FILTERS = { itemNo: "", operatorLike: "", operation: "" };
+// operation: [] means "no filter, every kind" (same convention the
+// multiselect column filters use) - not the empty string the plain
+// <select> this replaced used to hold.
+const EMPTY_FILTERS = { itemNo: "", operatorLike: "", operation: [] };
 
 // Rows per page: with more than this many entries the table gets a pager. The
 // server would allow up to 500 (wpsapi's smOperations.js HISTORY_LIMIT) - the
@@ -19,17 +24,92 @@ const PAGE_SIZE = 200;
 // Rows per request when exporting everything - the most the server returns.
 const EXPORT_CHUNK = 500;
 
-// Plain text, not a pill - unlike CipMaterialsHistoryTable's own
-// OperationBadge, which tags "InStorage"/"OutStorage" with a colored pill.
 // "labeling" is the second half of the order workflow (see AGENTS.md):
 // assigning a spool number to quantity already counted at "receipt" time
 // (AssignSpoolNumbersPanel) - it doesn't change stock, so it's its own
 // operation kind rather than another "receipt".
 const OPERATION_LABEL_KEYS = { receipt: "operationIn", issue: "operationOut", labeling: "operationLabeling" };
+const OPERATION_VALUES = Object.keys(OPERATION_LABEL_KEYS);
 
-function OperationLabel({ operation }) {
+// The multiselect filter above the table and the "Operacja" column's own
+// header filter both need to show these translated, not the raw
+// receipt/issue/labeling codes - the checkbox popover in MaterialsTable
+// just lists whatever's in row[column.key], so toTableRow puts the already-
+// translated text there (same trick BalanceTable.js uses for its own
+// status column) instead of the raw code a custom cell renderer would've
+// hidden the untranslated value behind.
+function operationLabel(t, operation) {
+  return t(OPERATION_LABEL_KEYS[operation] ?? "operationIn");
+}
+
+// Same visual language as ColumnFilterHeader's own multiselect popover
+// (checkbox list, Zaznacz/Odznacz wszystkie, Filtruj/Wyczyść filtry) - but
+// standalone rather than bound to a TanStack column, since this filter is
+// sent to the server (see handleSearch) instead of narrowing rows already
+// on screen.
+function OperationFilter({ value, onChange }) {
   const t = useTranslations("materialsHistorySm");
-  return <span className="text-gray-700 dark:text-neutral-200">{t(OPERATION_LABEL_KEYS[operation] ?? "operationIn")}</span>;
+  const tFilters = useTranslations("stock.filters");
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  function handleOpenChange(next) {
+    if (next) setDraft(value);
+    setOpen(next);
+  }
+
+  function toggle(op) {
+    setDraft((prev) => (prev.includes(op) ? prev.filter((v) => v !== op) : [...prev, op]));
+  }
+
+  function apply() {
+    onChange(draft);
+    setOpen(false);
+  }
+
+  function reset() {
+    onChange([]);
+    setOpen(false);
+  }
+
+  const label = value.length === 0 ? t("filters.operation") : value.map((op) => operationLabel(t, op)).join(", ");
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className={`${inputClasses} flex w-44 items-center justify-between gap-1.5 px-3 text-left`}
+          >
+            <span className="truncate">{label}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 dark:text-neutral-500" />
+          </button>
+        }
+      />
+      <PopoverContent align="start" className="w-56">
+        <div className="space-y-1">
+          {OPERATION_VALUES.map((op) => (
+            <label
+              key={op}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm text-gray-700 hover:bg-gray-50 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            >
+              <Checkbox checked={draft.includes(op)} onCheckedChange={() => toggle(op)} />
+              <span>{operationLabel(t, op)}</span>
+            </label>
+          ))}
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <Button type="button" size="sm" onClick={apply}>
+            {tFilters("apply")}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={reset}>
+            {tFilters("reset")}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 // No more standalone "Numer jednostki" column - for an FRP entry (the only
@@ -72,7 +152,7 @@ const COLUMNS = [
     className: "max-w-[220px] truncate",
     render: (row) => <ItemNameCell itemName={row.itemName} unitId={row.unitId} />,
   },
-  { key: "operation", headerKey: "historyOperation", filterFn: "multiselect", render: (row) => <OperationLabel operation={row.operation} /> },
+  { key: "operationLabel", headerKey: "historyOperation", filterFn: "multiselect" },
   { key: "quantity", headerKey: "historyQuantity", filterFn: "inNumberRange", sortable: true },
   // Batch numbers are long (e.g. PO26001030902690105@2026042301) - fixed at
   // 160px and cut off with an ellipsis, the full value on hover, instead of
@@ -91,8 +171,14 @@ const COLUMNS = [
 ];
 
 // A log entry as the table (and the export) shows it.
-function toTableRow(entry) {
-  return { ...entry, unitId: entry.unitId || "-", productBatch: entry.productBatch || "-", time: formatTime(entry.time) };
+function toTableRow(t, entry) {
+  return {
+    ...entry,
+    unitId: entry.unitId || "-",
+    productBatch: entry.productBatch || "-",
+    time: formatTime(entry.time),
+    operationLabel: operationLabel(t, entry.operation),
+  };
 }
 
 export default function SmMaterialsHistoryTable() {
@@ -113,7 +199,11 @@ export default function SmMaterialsHistoryTable() {
   // to the server - typing alone fetches nothing.
   const [draft, setDraft] = useState(EMPTY_FILTERS);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const hasFilters = Object.values(filters).some(Boolean);
+  // Plain .some(Boolean) would treat operation's empty array as truthy (any
+  // array is truthy) and think a filter's always active - check its length
+  // instead.
+  const isDirty = (f) => Boolean(f.itemNo) || Boolean(f.operatorLike) || f.operation.length > 0;
+  const hasFilters = isDirty(filters);
 
   useEffect(() => {
     setLoading(true);
@@ -140,7 +230,7 @@ export default function SmMaterialsHistoryTable() {
     setFilters(EMPTY_FILTERS);
   }
 
-  const data = useMemo(() => history.map(toTableRow), [history]);
+  const data = useMemo(() => history.map((entry) => toTableRow(t, entry)), [history, t]);
 
   // Excel export = every entry matching the filters last sent with "Szukaj",
   // not just the page on screen: fetched from the server in chunks of the
@@ -154,7 +244,7 @@ export default function SmMaterialsHistoryTable() {
       if (!rows.length) break;
       all.push(...rows);
     }
-    return all.map(toTableRow);
+    return all.map((entry) => toTableRow(t, entry));
   }
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
@@ -183,23 +273,12 @@ export default function SmMaterialsHistoryTable() {
           placeholder={t("filters.operator")}
           className={`${inputClasses} w-44 px-3`}
         />
-        <select
-          value={draft.operation}
-          onChange={(event) => setDraft((prev) => ({ ...prev, operation: event.target.value }))}
-          className={`${inputClasses} w-44 px-3`}
-        >
-          <option value="">{t("filters.operation")}</option>
-          {Object.entries(OPERATION_LABEL_KEYS).map(([value, labelKey]) => (
-            <option key={value} value={value}>
-              {t(labelKey)}
-            </option>
-          ))}
-        </select>
+        <OperationFilter value={draft.operation} onChange={(operation) => setDraft((prev) => ({ ...prev, operation }))} />
         <Button type="submit" size="sm" className="gap-1.5">
           <Search className="h-4 w-4" />
           {t("filters.search")}
         </Button>
-        {(hasFilters || Object.values(draft).some(Boolean)) && (
+        {(hasFilters || isDirty(draft)) && (
           <Button type="button" variant="ghost" size="sm" onClick={handleClear}>
             {t("filters.clear")}
           </Button>
