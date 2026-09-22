@@ -29,7 +29,7 @@ function formatDateTime(value) {
   return new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
-const HEAD_CLS = "sticky top-0 z-10 bg-gray-50 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:bg-neutral-800 dark:text-neutral-500";
+const HEAD_CLS = "sticky top-0 z-10 bg-gray-50 text-[11px] font-medium tracking-wide text-gray-400 dark:bg-neutral-800 dark:text-neutral-500";
 const CELL_CLS = "text-gray-600 dark:text-neutral-300";
 
 // Local-only concept table, same status as Materiały SM (see AGENTS.md's
