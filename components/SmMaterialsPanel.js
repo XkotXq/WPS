@@ -20,6 +20,21 @@ import { smCatalogApi } from "@/lib/smCatalogApi";
 import { smItemsApi, smOperationsApi } from "@/lib/smItemsApi";
 import { sanitizeQuantityInput } from "@/lib/quantityInput";
 
+// Whether a sm_catalog entry should offer per-spool tracking: its own
+// individually_tracked flag, or - as a safety net - category "FRP" and a
+// name that isn't "Coated FRP..." (same rule wpsapi's smCatalog.js now
+// defaults new catalog rows to on import, see defaultIndividualUnits
+// there). Covers a catalog row individually_tracked hasn't caught up on
+// yet (an older import, or a manual edit that only touched category)
+// without waiting on that to be fixed row by row.
+function catalogSaysIndividuallyTracked(catalogEntry) {
+  if (!catalogEntry) return false;
+  if (catalogEntry.individualUnits) return true;
+  const category = String(catalogEntry.category ?? "").trim().toLowerCase();
+  if (category !== "frp") return false;
+  return !/^coated\b/i.test(String(catalogEntry.itemName ?? "").trim());
+}
+
 // No unit suffix is stored (km/kg) - everyone already knows which unit a
 // given material uses, so quantities are plain numbers throughout.
 function sumQuantity(units) {
@@ -186,7 +201,7 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateAggregate, onR
       setResolved({
         itemNo: trimmed,
         itemName: catalogItem?.itemName,
-        trackedIndividually: Boolean(catalogItem?.individualUnits),
+        trackedIndividually: catalogSaysIndividuallyTracked(catalogItem),
       });
     } catch {
       // Leave `resolved` as-is (stale or null) - the local fallback below covers it.
@@ -214,7 +229,7 @@ function ReceiveUnitPanel({ open, onOpenChange, onCreate, onCreateAggregate, onR
     const stockMatch = items.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
     if (stockMatch) return Boolean(stockMatch.trackedIndividually);
     const catalogMatch = catalog.find((it) => it.itemNo.toLowerCase() === trimmed.toLowerCase());
-    return Boolean(catalogMatch?.individualUnits);
+    return catalogSaysIndividuallyTracked(catalogMatch);
   }
   const needsSpoolId = resolvedForCurrent ? resolvedForCurrent.trackedIndividually : isIndividuallyTracked(itemNo);
   // Not user-editable (see the itemName field below) - always whatever
@@ -453,6 +468,7 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, onDelete, t }) {
   const [itemName, setItemName] = useState("");
   const [unitId, setUnitId] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
   const hasUnitId = row?.kind === "unit";
   const hasQuantity = row?.kind === "unit" || row?.kind === "aggregate" || row?.kind === "pending";
@@ -463,6 +479,11 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, onDelete, t }) {
     setItemName(row.itemName);
     setUnitId(row.unitId ?? "");
     setQuantity(row.quantity ?? "");
+    // Item-level, same as ReceiveUnitPanel's own location field - every
+    // row of a given itemNo (whole item, a unit, the pending bucket)
+    // shares the one locationCode, so editing it here from any of them
+    // moves the whole material (see handleSave).
+    setLocation(row.locationCode ?? "");
     setNote(row.note && row.note !== "-" ? row.note : "");
   }, [row]);
 
@@ -470,7 +491,7 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, onDelete, t }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    const patch = { itemName, note: note.trim() || "-" };
+    const patch = { itemName, note: note.trim() || "-", locationCode: location.trim() || "MT" };
     if (hasUnitId) patch.unitId = unitId;
     if (hasQuantity) patch.quantity = quantity;
     onSave(row, patch);
@@ -516,6 +537,10 @@ function EditUnitPanel({ row, open, onOpenChange, onSave, onDelete, t }) {
               />
             </label>
           )}
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLS}>{t("columns.location")}</span>
+            <input className={FIELD_CLS} placeholder="MT" value={location} onChange={(e) => setLocation(e.target.value)} />
+          </label>
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLS}>{t("notePanel.noteLabel")}</span>
             <textarea
@@ -1338,7 +1363,7 @@ const BodyRow = memo(function BodyRow({
     const item = row.item;
     const isGrouped = viewMode === "grouped";
     const isZero = !(parseFloat(item.totalQuantity) > 0);
-    const actionRow = { kind: "aggregate", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, quantity: item.totalQuantity, note: item.note, isZero };
+    const actionRow = { kind: "aggregate", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, locationCode: item.locationCode, quantity: item.totalQuantity, note: item.note, isZero };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         {isGrouped && (
@@ -1374,7 +1399,7 @@ const BodyRow = memo(function BodyRow({
 
   if (row.kind === "flatUnit") {
     const { item, unit: u } = row;
-    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, productBatch: u.productBatch, quantity: u.quantity, note: u.note };
+    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, locationCode: item.locationCode, unitId: u.unitId, productBatch: u.productBatch, quantity: u.quantity, note: u.note };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         <TableCell className="pl-8">
@@ -1405,7 +1430,7 @@ const BodyRow = memo(function BodyRow({
 
   if (row.kind === "singleUnit") {
     const { item, unit: u } = row;
-    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, productBatch: u.productBatch, quantity: u.quantity, note: u.note };
+    const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, locationCode: item.locationCode, unitId: u.unitId, productBatch: u.productBatch, quantity: u.quantity, note: u.note };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         <TableCell className="w-8 pl-8">
@@ -1442,7 +1467,7 @@ const BodyRow = memo(function BodyRow({
   if (row.kind === "groupParent") {
     const item = row.item;
     const isZero = item.units.length === 0 && !hasPendingQuantity(item);
-    const itemEditRow = { kind: "item", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, note: item.note, isZero };
+    const itemEditRow = { kind: "item", id: item.itemNo, itemNo: item.itemNo, itemName: item.itemName, locationCode: item.locationCode, note: item.note, isZero };
     return (
       <TableRow onClick={isZero ? undefined : () => onToggleItem(item.itemNo)} className={`group ${isZero ? "" : "cursor-pointer"}`}>
         <TableCell className="w-8 pl-8">
@@ -1486,7 +1511,7 @@ const BodyRow = memo(function BodyRow({
   if (row.kind === "pendingChild") {
     const item = row.item;
     const pendingId = `${item.itemNo}-pending`;
-    const pendingActionRow = { kind: "pending", id: pendingId, itemNo: item.itemNo, itemName: item.itemName, quantity: item.pendingQuantity, note: item.note };
+    const pendingActionRow = { kind: "pending", id: pendingId, itemNo: item.itemNo, itemName: item.itemName, locationCode: item.locationCode, quantity: item.pendingQuantity, note: item.note };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         <TableCell className="relative w-8 pl-8">
@@ -1525,7 +1550,7 @@ const BodyRow = memo(function BodyRow({
   if (row.kind === "pendingRow") {
     const item = row.item;
     const pendingId = `${item.itemNo}-pending`;
-    const pendingActionRow = { kind: "pending", id: pendingId, itemNo: item.itemNo, itemName: item.itemName, quantity: item.pendingQuantity, note: item.note };
+    const pendingActionRow = { kind: "pending", id: pendingId, itemNo: item.itemNo, itemName: item.itemName, locationCode: item.locationCode, quantity: item.pendingQuantity, note: item.note };
     return (
       <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
         <TableCell className="pl-8">
@@ -1559,7 +1584,7 @@ const BodyRow = memo(function BodyRow({
 
   // groupChild
   const { item, unit: u } = row;
-  const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, unitId: u.unitId, quantity: u.quantity, note: u.note };
+  const actionRow = { kind: "unit", id: u.id, itemNo: item.itemNo, itemName: item.itemName, locationCode: item.locationCode, unitId: u.unitId, quantity: u.quantity, note: u.note };
   return (
     <TableRow className="group" data-state={isSelected ? "selected" : undefined}>
       <TableCell className="relative w-8 pl-8">
@@ -2176,21 +2201,26 @@ export default function SmMaterialsPanel() {
   }
 
   function handleSave(row, patch) {
+    // locationCode is item-level (see EditUnitPanel) - applied the same way
+    // regardless of which row (whole item, a unit, the pending bucket)
+    // was actually opened to edit it.
     setItems((prev) =>
       prev.map((it) => {
         if (it.itemNo !== row.itemNo) return it;
+        const locationCode = patch.locationCode ?? it.locationCode;
         if (row.kind === "aggregate") {
-          return { ...it, itemName: patch.itemName, totalQuantity: patch.quantity, note: patch.note };
+          return { ...it, itemName: patch.itemName, locationCode, totalQuantity: patch.quantity, note: patch.note };
         }
         if (row.kind === "item") {
-          return { ...it, itemName: patch.itemName, note: patch.note };
+          return { ...it, itemName: patch.itemName, locationCode, note: patch.note };
         }
         if (row.kind === "pending") {
-          return { ...it, itemName: patch.itemName, pendingQuantity: patch.quantity, note: patch.note };
+          return { ...it, itemName: patch.itemName, locationCode, pendingQuantity: patch.quantity, note: patch.note };
         }
         return {
           ...it,
           itemName: patch.itemName ?? it.itemName,
+          locationCode,
           units: it.units.map((u) => (u.id === row.id ? { ...u, unitId: patch.unitId, quantity: patch.quantity, note: patch.note } : u)),
         };
       })
