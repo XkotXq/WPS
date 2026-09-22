@@ -77,6 +77,7 @@ export default function OrdersCipListTable() {
                 <TableHead className={HEAD_CLS}>{t("columns.status")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.line")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.employeeNo")}</TableHead>
+                <TableHead className={HEAD_CLS}>{t("columns.fulfilledBy")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.createdAt")}</TableHead>
                 <TableHead className={`pr-4 ${HEAD_CLS}`}>{t("columns.note")}</TableHead>
               </TableRow>
@@ -84,7 +85,7 @@ export default function OrdersCipListTable() {
             <TableBody>
               {orders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
                     {t("emptyStatus")}
                   </TableCell>
                 </TableRow>
@@ -107,6 +108,7 @@ export default function OrdersCipListTable() {
                       </TableCell>
                       <TableCell className={CELL_CLS}>{order.line}</TableCell>
                       <TableCell className={CELL_CLS}>{order.employeeNo}</TableCell>
+                      <TableCell className={CELL_CLS}>{order.fulfilledBy}</TableCell>
                       <TableCell className={CELL_CLS}>{formatDateTime(order.createdAt)}</TableCell>
                       <TableCell className={`pr-4 ${CELL_CLS}`}>{order.note}</TableCell>
                     </TableRow>
@@ -123,7 +125,7 @@ export default function OrdersCipListTable() {
                             {item.itemName}
                           </TableCell>
                           <TableCell className={`tabular-nums ${CELL_CLS}`}>{item.quantity}</TableCell>
-                          <TableCell colSpan={2} className={`pr-4 text-gray-400 dark:text-neutral-500`}>
+                          <TableCell colSpan={3} className={`pr-4 text-gray-400 dark:text-neutral-500`}>
                             {item.note}
                           </TableCell>
                         </TableRow>

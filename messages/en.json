@@ -281,6 +281,7 @@
       "status": "Status",
       "line": "Line",
       "employeeNo": "Ordered by",
+      "fulfilledBy": "Fulfilled by",
       "createdAt": "Created at",
       "note": "Note"
     },

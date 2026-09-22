@@ -281,6 +281,7 @@
       "status": "Status",
       "line": "Linia",
       "employeeNo": "Zamawiający",
+      "fulfilledBy": "Zrealizował",
       "createdAt": "Data utworzenia",
       "note": "Notatka"
     },
