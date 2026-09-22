@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import MaterialsTable from "@/components/MaterialsTable";
-import FrpFilters from "@/components/FrpFilters";
 import { smOperationsApi } from "@/lib/smItemsApi";
 
 // Same look as the filter row on Lista materiałów SM (SmMaterialsPanel.js).
@@ -110,7 +109,6 @@ export default function SmMaterialsHistoryTable() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [search, setSearch] = useState("");
   // `draft` is what's typed in the boxes; `filters` is what "Szukaj" last sent
   // to the server - typing alone fetches nothing.
   const [draft, setDraft] = useState(EMPTY_FILTERS);
@@ -217,14 +215,7 @@ export default function SmMaterialsHistoryTable() {
       ) : (
         <>
           <p className="mb-3 text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: total })}</p>
-          <FrpFilters onGlobalFilterChange={setSearch} />
-          <MaterialsTable
-            data={data}
-            columns={COLUMNS}
-            globalFilter={search}
-            onGlobalFilterChange={setSearch}
-            loadAllRowsForExport={loadAllRowsForExport}
-          />
+          <MaterialsTable data={data} columns={COLUMNS} loadAllRowsForExport={loadAllRowsForExport} />
           {totalPages > 1 && (
             <div className="mt-3 flex items-center justify-center gap-3">
               <Button variant="outline" size="sm" disabled={page <= 0} onClick={() => setPage((p) => p - 1)}>
