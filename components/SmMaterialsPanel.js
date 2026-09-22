@@ -789,11 +789,11 @@ function AssignSpoolNumbersPanel({ item, open, onOpenChange, onAssign, t }) {
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{t("assignPanel.title")}</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("assignPanel.title")}</DialogTitle>
+        </DialogHeader>
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
           <div className="rounded-lg border border-gray-100 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800/50 p-3 text-sm">
@@ -863,16 +863,16 @@ function AssignSpoolNumbersPanel({ item, open, onOpenChange, onAssign, t }) {
           )}
         </div>
 
-        <SheetFooter>
+        <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {t("assignPanel.cancel")}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={remaining < 0}>
             {t("assignPanel.save")}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
