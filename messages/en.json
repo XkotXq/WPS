@@ -486,7 +486,22 @@
       "delete": "Delete",
       "save": "Save",
       "confirmDelete": "Delete {itemNo} from the catalog?",
+      "categoryUnits": "Category units",
       "spoolNumbering": "Spool numbering"
+    },
+    "categoryUnits": {
+      "title": "Category units",
+      "hint": "Set one unit for every item of a category at once instead of editing them one by one. This overwrites the units of all items in that category.",
+      "category": "Category",
+      "items": "Items",
+      "current": "Now",
+      "mixed": "mixed",
+      "newUnit": "New unit",
+      "apply": "Set",
+      "applying": "Saving…",
+      "uncategorized": "(no category)",
+      "confirm": "Set unit \"{unit}\" for all {count} items of category \"{category}\"?",
+      "close": "Close"
     },
     "importDialog": {
       "title": "Import into the catalog",
@@ -502,6 +517,7 @@
       "importing": "Importing…"
     },
     "toast": {
+      "categoryUnitSet": "Unit {unit} set for category {category} ({count} items).",
       "imported": "Import: added {created}, updated {updated}, errors {failed}."
     },
     "form": {
