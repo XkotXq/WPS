@@ -170,7 +170,17 @@ page layers that missing per-unit detail on top, backed by wpsapi's
   paste), the typed name is checked against `sm_catalog` and silently
   replaced with the catalog's name on mismatch (`resolveCatalogItemName`)
   before it's saved or logged - keeps `sm_items`/`sm_operations` from
-  accumulating operator typos/variants for the same item number.
+  accumulating operator typos/variants for the same item number. wpsapi now
+  does the same server-side (`catalogItemName`, see its AGENTS.md), so this is
+  a convenience for the typist, not the guarantee.
+- **Catalog page** (`SmMaterialsCatalogTable.js`): per-item form, Excel import,
+  "Numeracja szpul", and "Osobne jednostki kategorii" - a dialog that flips
+  `individualUnits` for a whole category with one checkbox
+  (`smCatalogApi.setCategoryIndividualUnits`; checked = all, dash = a mix, e.g.
+  FRP also holds "Coated FRP" rows). `ReceiveUnitPanel` asks the API for the
+  typed item on leaving the Nr itemu field (`resolveItemNo`); whether the
+  Numer szpuli field appears is that entry's `individualUnits` flag alone
+  (`catalogSaysIndividuallyTracked`).
 - **History**: every receive/issue/labeling action also calls
   `logOperation`, which POSTs to `/api/sm-operations` (`wpsapi/src/smOperations.js`,
   table `sm_operations`) - shown on `materials-list-sm/history-sm`
@@ -203,6 +213,17 @@ Known gotchas worth knowing before editing:
   anywhere yet; there's no backend endpoint for either.
 
 <!-- BEGIN:nextjs-agent-rules -->
+
+## Zamówienia (orders) - current state
+"Lista zamówień" (`components/OrdersCipListTable.js`) is a local-only demo on
+`lib/ordersCipSeed.js` (component state, no backend): one flat table, status
+as a badge, a "Zamów" dialog (line picked from the fixed line codes, materials
+searched in `sm_catalog` with the unit read from it). "Historia zamówień",
+"Wytyczne do zamówień" and "Raporty" are placeholders. The real data model
+(transport orders of six types, order numbers, shifts A/B/C, photos), the
+decisions taken and the roadmap (JWT auth -> Hasura -> these screens on Hasura)
+are in `../wpsApi/AGENTS.md` ("Transport orders" and "Roadmap").
+Intended split once real: list = new + in progress, history = done + cancelled.
 
 # This is NOT the Next.js you know
 
