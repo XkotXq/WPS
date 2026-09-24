@@ -20,19 +20,11 @@ import { smCatalogApi } from "@/lib/smCatalogApi";
 import { smItemsApi, smOperationsApi } from "@/lib/smItemsApi";
 import { sanitizeQuantityInput } from "@/lib/quantityInput";
 
-// Whether a sm_catalog entry should offer per-spool tracking: its own
-// individually_tracked flag, or - as a safety net - category "FRP" and a
-// name that isn't "Coated FRP..." (same rule wpsapi's smCatalog.js now
-// defaults new catalog rows to on import, see defaultIndividualUnits
-// there). Covers a catalog row individually_tracked hasn't caught up on
-// yet (an older import, or a manual edit that only touched category)
-// without waiting on that to be fixed row by row.
+// Whether a sm_catalog entry should offer per-spool tracking: its
+// individualUnits ("Osobne jednostki") flag, which the catalog page sets per
+// item or for a whole category at once.
 function catalogSaysIndividuallyTracked(catalogEntry) {
-  if (!catalogEntry) return false;
-  if (catalogEntry.individualUnits) return true;
-  const category = String(catalogEntry.category ?? "").trim().toLowerCase();
-  if (category !== "frp") return false;
-  return !/^coated\b/i.test(String(catalogEntry.itemName ?? "").trim());
+  return Boolean(catalogEntry?.individualUnits);
 }
 
 // No unit suffix is stored (km/kg) - everyone already knows which unit a

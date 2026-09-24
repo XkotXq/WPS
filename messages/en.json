@@ -486,21 +486,17 @@
       "delete": "Delete",
       "save": "Save",
       "confirmDelete": "Delete {itemNo} from the catalog?",
-      "categoryUnits": "Category units",
+      "categoryUnits": "Category separate units",
       "spoolNumbering": "Spool numbering"
     },
     "categoryUnits": {
-      "title": "Category units",
-      "hint": "Set one unit for every item of a category at once instead of editing them one by one. This overwrites the units of all items in that category.",
+      "title": "Separate units per category",
+      "hint": "Tick a category to have all its materials split into separate, numbered units (e.g. spools) instead of being summed into one value. This changes the catalog entries - material already in stock keeps its current setting.",
       "category": "Category",
-      "items": "Items",
-      "current": "Now",
-      "mixed": "mixed",
-      "newUnit": "New unit",
-      "apply": "Set",
-      "applying": "Saving…",
+      "split": "Split",
       "uncategorized": "(no category)",
-      "confirm": "Set unit \"{unit}\" for all {count} items of category \"{category}\"?",
+      "confirmOn": "Split all {count} items of category \"{category}\" into separate units?",
+      "confirmOff": "Stop splitting all {count} items of category \"{category}\" into units?",
       "close": "Close"
     },
     "importDialog": {
@@ -517,7 +513,8 @@
       "importing": "Importing…"
     },
     "toast": {
-      "categoryUnitSet": "Unit {unit} set for category {category} ({count} items).",
+      "categorySplitOn": "Category {category}: materials split into separate units ({count} items changed).",
+      "categorySplitOff": "Category {category}: materials no longer split into units ({count} items changed).",
       "imported": "Import: added {created}, updated {updated}, errors {failed}."
     },
     "form": {

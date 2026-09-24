@@ -486,21 +486,17 @@
       "delete": "Usuń",
       "save": "Zapisz",
       "confirmDelete": "Usunąć {itemNo} z katalogu?",
-      "categoryUnits": "Jednostki kategorii",
+      "categoryUnits": "Osobne jednostki kategorii",
       "spoolNumbering": "Numeracja szpul"
     },
     "categoryUnits": {
-      "title": "Jednostki kategorii",
-      "hint": "Ustaw jedną jednostkę dla wszystkich pozycji kategorii naraz, zamiast edytować je po kolei. Zmiana nadpisuje jednostki wszystkich pozycji tej kategorii.",
+      "title": "Osobne jednostki kategorii",
+      "hint": "Zaznacz kategorię, aby wszystkie jej materiały były rozdzielane na osobne, numerowane jednostki (np. szpule), zamiast sumować się w jedną wartość. Zmienia to ustawienie pozycji w katalogu - materiał, który już leży na stanie, zachowuje swoje dotychczasowe ustawienie.",
       "category": "Kategoria",
-      "items": "Pozycji",
-      "current": "Teraz",
-      "mixed": "różne",
-      "newUnit": "Nowa jednostka",
-      "apply": "Ustaw",
-      "applying": "Zapisywanie…",
+      "split": "Rozdzielone",
       "uncategorized": "(bez kategorii)",
-      "confirm": "Ustawić jednostkę „{unit}” dla wszystkich {count} pozycji kategorii „{category}”?",
+      "confirmOn": "Rozdzielać na osobne jednostki wszystkie {count} pozycji kategorii „{category}”?",
+      "confirmOff": "Przestać rozdzielać na jednostki wszystkie {count} pozycji kategorii „{category}”?",
       "close": "Zamknij"
     },
     "importDialog": {
@@ -517,7 +513,8 @@
       "importing": "Importowanie…"
     },
     "toast": {
-      "categoryUnitSet": "Ustawiono jednostkę {unit} dla kategorii {category} ({count} pozycji).",
+      "categorySplitOn": "Kategoria {category}: materiały rozdzielone na osobne jednostki (zmieniono {count} pozycji).",
+      "categorySplitOff": "Kategoria {category}: materiały już nie są rozdzielane na jednostki (zmieniono {count} pozycji).",
       "imported": "Import: dodano {created}, zaktualizowano {updated}, błędów {failed}."
     },
     "form": {

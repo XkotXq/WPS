@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Upload, Hash, Ruler } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Hash, Layers } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToastStack, useToastStack } from "@/components/ui/toast";
@@ -105,18 +106,18 @@ function EntryForm({ initial, onSubmit, onCancel, submitLabel, t }) {
   );
 }
 
-// Every category of the catalog with how many entries it has and which units
-// they carry now - one row each, with a field to set one unit for the whole
-// category at once instead of editing its items one by one. The catalog is
-// small (a few dozen categories), so this is a plain list, not a table.
+// Every category of the catalog with how many of its entries are split into
+// separate units ("Osobne jednostki") - one checkbox per category flips the
+// whole category at once instead of ticking it item by item. Checked = all
+// split, empty = none, dash = a mix (e.g. FRP, which holds "Coated FRP..." rows
+// that are not split). The catalog is small (a few dozen categories), so this
+// is a plain list, not a table.
 function CategoryUnitsDialog({ open, onOpenChange, catalog, onApplied, t }) {
-  const [drafts, setDrafts] = useState({});
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
-    setDrafts({});
     setBusy(null);
     setError("");
   }, [open]);
@@ -125,24 +126,25 @@ function CategoryUnitsDialog({ open, onOpenChange, catalog, onApplied, t }) {
     const byCategory = new Map();
     for (const entry of catalog) {
       const key = entry.category ?? "";
-      const group = byCategory.get(key) ?? { category: key, count: 0, units: new Set() };
+      const group = byCategory.get(key) ?? { category: key, count: 0, split: 0 };
       group.count += 1;
-      if (entry.unit) group.units.add(entry.unit);
+      if (entry.individualUnits) group.split += 1;
       byCategory.set(key, group);
     }
     return [...byCategory.values()].sort((a, b) => a.category.localeCompare(b.category, undefined, { numeric: true }));
   }, [catalog]);
 
-  async function apply(group) {
-    const unit = (drafts[group.category] ?? "").trim();
-    if (!unit || busy !== null) return;
+  // Unchecked or mixed -> split them all; fully checked -> stop splitting.
+  async function toggle(group) {
+    if (busy !== null) return;
+    const next = group.split !== group.count;
     const label = group.category || t("categoryUnits.uncategorized");
-    if (!window.confirm(t("categoryUnits.confirm", { unit, category: label, count: group.count }))) return;
+    const message = t(next ? "categoryUnits.confirmOn" : "categoryUnits.confirmOff", { category: label, count: group.count });
+    if (!window.confirm(message)) return;
     setBusy(group.category);
     setError("");
     try {
-      await onApplied(group.category, unit, label);
-      setDrafts((prev) => ({ ...prev, [group.category]: "" }));
+      await onApplied(group.category, next, label);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -152,42 +154,30 @@ function CategoryUnitsDialog({ open, onOpenChange, catalog, onApplied, t }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("categoryUnits.title")}</DialogTitle>
           <DialogDescription>{t("categoryUnits.hint")}</DialogDescription>
         </DialogHeader>
         <div className="max-h-[55vh] overflow-y-auto">
-          <div className="grid grid-cols-[1fr_auto_6rem_7rem_auto] items-center gap-x-3 gap-y-1.5 text-sm">
-            <span className={fieldLabelClasses}>{t("categoryUnits.category")}</span>
-            <span className={`${fieldLabelClasses} text-right`}>{t("categoryUnits.items")}</span>
-            <span className={fieldLabelClasses}>{t("categoryUnits.current")}</span>
-            <span className={fieldLabelClasses}>{t("categoryUnits.newUnit")}</span>
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 text-sm">
             <span />
-            {categories.map((group) => {
-              const units = [...group.units];
-              const current = units.length === 0 ? "-" : units.length === 1 ? units[0] : t("categoryUnits.mixed");
-              const draft = drafts[group.category] ?? "";
-              return (
-                <div key={group.category || "__none"} className="contents">
-                  <span className="truncate text-gray-900 dark:text-neutral-100">{group.category || t("categoryUnits.uncategorized")}</span>
-                  <span className="text-right tabular-nums text-gray-500 dark:text-neutral-400">{group.count}</span>
-                  <span className="truncate text-gray-600 dark:text-neutral-300" title={units.join(", ")}>
-                    {current}
-                  </span>
-                  <input
-                    type="text"
-                    value={draft}
-                    onChange={(event) => setDrafts((prev) => ({ ...prev, [group.category]: event.target.value }))}
-                    onKeyDown={(event) => event.key === "Enter" && apply(group)}
-                    className={inputClasses}
-                  />
-                  <Button size="sm" variant="outline" disabled={!draft.trim() || busy !== null} onClick={() => apply(group)}>
-                    {busy === group.category ? t("categoryUnits.applying") : t("categoryUnits.apply")}
-                  </Button>
-                </div>
-              );
-            })}
+            <span className={fieldLabelClasses}>{t("categoryUnits.category")}</span>
+            <span className={`${fieldLabelClasses} text-right`}>{t("categoryUnits.split")}</span>
+            {categories.map((group) => (
+              <label key={group.category || "__none"} className="contents cursor-pointer">
+                <Checkbox
+                  checked={group.split === group.count}
+                  indeterminate={group.split > 0 && group.split < group.count}
+                  disabled={busy !== null}
+                  onCheckedChange={() => toggle(group)}
+                />
+                <span className="truncate py-1 text-gray-900 dark:text-neutral-100">{group.category || t("categoryUnits.uncategorized")}</span>
+                <span className="text-right tabular-nums text-gray-500 dark:text-neutral-400">
+                  {group.split} / {group.count}
+                </span>
+              </label>
+            ))}
           </div>
         </div>
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -328,12 +318,12 @@ export default function SmMaterialsCatalogTable() {
     pushToast(t("toast.imported", { created, updated, failed }));
   }
 
-  // Sets one unit on every entry of the category - on the server in one
-  // statement, then mirrored here so the table shows it without a reload.
-  async function handleCategoryUnit(category, unit, label) {
-    const { updated } = await smCatalogApi.setCategoryUnit(category, unit);
-    setCatalog((prev) => prev.map((it) => ((it.category ?? "") === category ? { ...it, unit } : it)));
-    pushToast(t("toast.categoryUnitSet", { unit, category: label, count: updated }));
+  // Sets "Osobne jednostki" on every entry of the category - on the server
+  // in one statement, then mirrored here so the table shows it without a reload.
+  async function handleCategoryIndividualUnits(category, individualUnits, label) {
+    const { updated } = await smCatalogApi.setCategoryIndividualUnits(category, individualUnits);
+    setCatalog((prev) => prev.map((it) => ((it.category ?? "") === category ? { ...it, individualUnits } : it)));
+    pushToast(t(individualUnits ? "toast.categorySplitOn" : "toast.categorySplitOff", { category: label, count: updated }));
   }
 
   async function handleDelete(itemNo) {
@@ -350,7 +340,7 @@ export default function SmMaterialsCatalogTable() {
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setCategoryUnitsOpen(true)}>
-            <Ruler className="h-4 w-4" />
+            <Layers className="h-4 w-4" />
             {t("actions.categoryUnits")}
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setNumberingOpen(true)}>
@@ -383,7 +373,7 @@ export default function SmMaterialsCatalogTable() {
         open={categoryUnitsOpen}
         onOpenChange={setCategoryUnitsOpen}
         catalog={catalog}
-        onApplied={handleCategoryUnit}
+        onApplied={handleCategoryIndividualUnits}
         t={t}
       />
 
