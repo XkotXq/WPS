@@ -157,7 +157,6 @@ function CategoryUnitsDialog({ open, onOpenChange, catalog, onApplied, t }) {
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("categoryUnits.title")}</DialogTitle>
-          <DialogDescription>{t("categoryUnits.hint")}</DialogDescription>
         </DialogHeader>
         <div className="max-h-[55vh] overflow-y-auto">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 text-sm">

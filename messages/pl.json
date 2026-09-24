@@ -491,7 +491,6 @@
     },
     "categoryUnits": {
       "title": "Osobne jednostki kategorii",
-      "hint": "Zaznacz kategorię, aby wszystkie jej materiały były rozdzielane na osobne, numerowane jednostki (np. szpule), zamiast sumować się w jedną wartość. Zmienia to ustawienie pozycji w katalogu - materiał, który już leży na stanie, zachowuje swoje dotychczasowe ustawienie.",
       "category": "Kategoria",
       "split": "Rozdzielone",
       "uncategorized": "(bez kategorii)",

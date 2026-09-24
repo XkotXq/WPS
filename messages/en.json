@@ -491,7 +491,6 @@
     },
     "categoryUnits": {
       "title": "Separate units per category",
-      "hint": "Tick a category to have all its materials split into separate, numbered units (e.g. spools) instead of being summed into one value. This changes the catalog entries - material already in stock keeps its current setting.",
       "category": "Category",
       "split": "Split",
       "uncategorized": "(no category)",
