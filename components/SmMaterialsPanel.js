@@ -16,6 +16,7 @@ import BulkReceiveGrid, { newBulkReceiveRow } from "@/components/BulkReceiveGrid
 import SmMaterialStockChart from "@/components/SmMaterialStockChart";
 import { downloadStockXlsx } from "@/lib/xlsxExport";
 import { getCipSession } from "@/lib/cipSession";
+import { upsertSmItemViaCip } from "@/lib/smItemsCipApi";
 import { smCatalogApi } from "@/lib/smCatalogApi";
 import { smItemsApi, smOperationsApi } from "@/lib/smItemsApi";
 import { sanitizeQuantityInput } from "@/lib/quantityInput";
@@ -1741,19 +1742,79 @@ export default function SmMaterialsPanel() {
   // the local UI already reflects the change either way; only a later
   // reload would show it missing, same trade-off as sm_catalog's own
   // autofill fetch.
-  function setItems(updater) {
-    setItemsRaw((prev) => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      const prevByNo = new Map(prev.map((it) => [it.itemNo, it]));
-      const nextByNo = new Map(next.map((it) => [it.itemNo, it]));
-      for (const [itemNo, item] of nextByNo) {
-        if (prevByNo.get(itemNo) !== item) smItemsApi.upsert(item).catch(() => {});
+  // `cipTasks`, when given: { [itemNo]: { operation: "receipt" | "issue",
+  // quantity } } - this call's own delta for that item (see the
+  // cipTasksFor* helpers below handleIssue/handleCreate etc., which build it
+  // from the same entries logOperation gets). Only items listed there are
+  // checked against CIP before being saved; everything else keeps the exact
+  // fire-and-forget behavior this always had (optimistic, errors swallowed -
+  // fine for a location rename or a label, never for stock actually moving).
+  //
+  // Returns { ok: true } once every CIP-gated item has been pushed and saved,
+  // or { ok: false, error } on the first one CIP refuses - that item's (and
+  // every item after it, not yet attempted) new state is dropped from what
+  // gets applied, so the UI never shows a receipt/issue as done when CIP
+  // said no. Per Next.js's own guidance for Server Actions, CIP-gated items
+  // are awaited one at a time here, not Promise.all'd.
+  async function setItems(updater, cipTasks) {
+    let result = { ok: true };
+    // Read via the closed-over `items`, not an updater - this can no longer be
+    // a synchronous setState updater once it has to await CIP calls in the
+    // middle. Every handler below already reads `items` the same way (e.g.
+    // handleIssue's `items.find(...)`), so this isn't a new assumption.
+    const prev = items;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    const prevByNo = new Map(prev.map((it) => [it.itemNo, it]));
+    const nextByNo = new Map(next.map((it) => [it.itemNo, it]));
+    const applied = new Map(nextByNo);
+
+    // A refused/failed item reverts to its *previous* state (still applied,
+    // just not changed) rather than dropping out of the list - the item was
+    // already there before this action; CIP saying no doesn't make it
+    // disappear, it just means this particular change didn't happen. Only a
+    // brand-new item (nothing in prevByNo) actually has nothing to fall back
+    // to, so that one is the one case this removes from what gets applied.
+    function revert(itemNo) {
+      const prevItem = prevByNo.get(itemNo);
+      if (prevItem) applied.set(itemNo, prevItem);
+      else applied.delete(itemNo);
+    }
+
+    if (cipTasks) {
+      for (const [itemNo, task] of Object.entries(cipTasks)) {
+        const item = nextByNo.get(itemNo);
+        if (!item || prevByNo.get(itemNo) === item) continue; // nothing actually changed for this item
+        if (result.ok === false) {
+          // An earlier item in this same batch already failed - don't push
+          // any more to CIP, and don't apply this one's change either.
+          revert(itemNo);
+          continue;
+        }
+        try {
+          const saved = await upsertSmItemViaCip(item, task);
+          applied.set(itemNo, saved);
+        } catch (err) {
+          revert(itemNo);
+          result = { ok: false, error: err.message };
+        }
       }
-      for (const itemNo of prevByNo.keys()) {
-        if (!nextByNo.has(itemNo)) smItemsApi.remove(itemNo).catch(() => {});
+    }
+    for (const [itemNo, item] of nextByNo) {
+      if (cipTasks?.[itemNo]) continue; // already handled above
+      if (prevByNo.get(itemNo) !== item) smItemsApi.upsert(item).catch(() => {});
+    }
+    for (const itemNo of prevByNo.keys()) {
+      if (!nextByNo.has(itemNo)) smItemsApi.remove(itemNo).catch(() => {});
+    }
+
+    setItemsRaw(() => {
+      const finalNext = [];
+      for (const it of next) {
+        if (applied.has(it.itemNo)) finalNext.push(applied.get(it.itemNo));
       }
-      return next;
+      return finalNext;
     });
+    return result;
   }
 
   // Called from every mutation entry point (handleCreate/handleIssue/
@@ -2050,6 +2111,22 @@ export default function SmMaterialsPanel() {
     return rows;
   }, [items, selectedIds]);
 
+  // Sums several entries' own quantity by item number into the shape
+  // setItems's `cipTasks` wants - handleReceiveOrder/handleBulkIssue can each
+  // touch the same item more than once in a single batch (two rows of the
+  // same material pasted into the order grid, two units of one item bulk-
+  // issued together); CIP only ever sees one write per item, so the batch's
+  // whole effect on it has to be summed into one delta first.
+  function cipTasksByItemNo(entries, operation) {
+    const tasks = {};
+    for (const { itemNo, quantity } of entries) {
+      const qty = parseFloat(quantity) || 0;
+      const prevQty = tasks[itemNo] ? parseFloat(tasks[itemNo].quantity) : 0;
+      tasks[itemNo] = { operation, quantity: String(prevQty + qty) };
+    }
+    return tasks;
+  }
+
   // Pure reducer step shared by both handleCreate (one unit) and
   // handleCreateBulk (the bulk-receipt grid's many rows folded over the
   // same running items array) - same shape as issueRow below.
@@ -2071,8 +2148,14 @@ export default function SmMaterialsPanel() {
     return { operation: "receipt", itemNo: unit.itemNo, itemName: unit.itemName, unitId: unit.unitId, quantity: unit.quantity, location: unit.locationCode };
   }
 
-  function handleCreate(unit) {
-    setItems((prev) => receiveUnit(prev, unit));
+  async function handleCreate(unit) {
+    const result = await setItems((prev) => receiveUnit(prev, unit), {
+      [unit.itemNo]: { operation: "receipt", quantity: unit.quantity },
+    });
+    if (!result.ok) {
+      window.alert(result.error);
+      return;
+    }
     setExpandedItems((prev) => ({ ...prev, [unit.itemNo]: true }));
     logOperation([historyEntryForReceipt(unit)]);
     pushToast(t("toast.received", { itemName: unit.itemName, quantity: unit.quantity }));
@@ -2096,8 +2179,14 @@ export default function SmMaterialsPanel() {
     return next;
   }
 
-  function handleCreateAggregate(entry) {
-    setItems((prev) => receiveAggregate(prev, entry));
+  async function handleCreateAggregate(entry) {
+    const result = await setItems((prev) => receiveAggregate(prev, entry), {
+      [entry.itemNo]: { operation: "receipt", quantity: entry.quantity },
+    });
+    if (!result.ok) {
+      window.alert(result.error);
+      return;
+    }
     logOperation([{ operation: "receipt", itemNo: entry.itemNo, itemName: entry.itemName, unitId: "", quantity: entry.quantity, location: entry.locationCode }]);
     pushToast(t("toast.received", { itemName: entry.itemName, quantity: entry.quantity }));
   }
@@ -2136,8 +2225,15 @@ export default function SmMaterialsPanel() {
     return next;
   }
 
-  function handleReceiveOrder(entries) {
-    setItems((prev) => entries.reduce((acc, entry) => receivePendingQuantity(acc, entry), prev));
+  async function handleReceiveOrder(entries) {
+    const result = await setItems(
+      (prev) => entries.reduce((acc, entry) => receivePendingQuantity(acc, entry), prev),
+      cipTasksByItemNo(entries, "receipt")
+    );
+    if (!result.ok) {
+      window.alert(result.error);
+      return;
+    }
     setExpandedItems((prev) => {
       const next = { ...prev };
       entries.forEach((entry) => {
@@ -2272,11 +2368,18 @@ export default function SmMaterialsPanel() {
     });
   }
 
-  function handleIssue(row, quantity) {
+  async function handleIssue(row, quantity) {
     const item = items.find((it) => it.itemNo === row.itemNo);
-    setItems((prev) => issueRow(prev, row, quantity));
-    logOperation([{ operation: "issue", itemNo: row.itemNo, itemName: row.itemName, unitId: row.unitId, quantity: quantity ?? row.quantity, location: item?.locationCode }]);
-    pushToast(t("toast.issued", { itemName: row.itemName, quantity: quantity ?? row.quantity }));
+    const issuedQty = quantity ?? row.quantity;
+    const result = await setItems((prev) => issueRow(prev, row, quantity), {
+      [row.itemNo]: { operation: "issue", quantity: issuedQty },
+    });
+    if (!result.ok) {
+      window.alert(result.error);
+      return;
+    }
+    logOperation([{ operation: "issue", itemNo: row.itemNo, itemName: row.itemName, unitId: row.unitId, quantity: issuedQty, location: item?.locationCode }]);
+    pushToast(t("toast.issued", { itemName: row.itemName, quantity: issuedQty }));
   }
 
   // Manual cleanup for a material that's sitting at 0 (see issueRow's
@@ -2297,8 +2400,19 @@ export default function SmMaterialsPanel() {
   // with its own (editable, prefilled-to-full) quantity - reduced through
   // the same issueRow used everywhere else so a smaller amount shrinks the
   // unit instead of always removing it outright.
-  function handleIssueUnits(item, entries) {
-    setItems((prev) => entries.reduce((acc, { id, quantity }) => issueRow(acc, { kind: "unit", itemNo: item.itemNo, id }, quantity), prev));
+  async function handleIssueUnits(item, entries) {
+    const totalQty = entries.reduce((sum, { id, quantity }) => {
+      const u = item.units.find((unit) => unit.id === id);
+      return sum + (parseFloat(quantity ?? u.quantity) || 0);
+    }, 0);
+    const result = await setItems(
+      (prev) => entries.reduce((acc, { id, quantity }) => issueRow(acc, { kind: "unit", itemNo: item.itemNo, id }, quantity), prev),
+      { [item.itemNo]: { operation: "issue", quantity: String(totalQty) } }
+    );
+    if (!result.ok) {
+      window.alert(result.error);
+      return;
+    }
     logOperation(
       entries.map(({ id, quantity }) => {
         const u = item.units.find((unit) => unit.id === id);
@@ -2316,8 +2430,18 @@ export default function SmMaterialsPanel() {
 
   // Cross-item bulk issue - each selected leaf row (unit or whole
   // aggregate item), issued in sequence over the same running items array.
-  function handleBulkIssue(entries) {
-    setItems((prev) => entries.reduce((acc, { row, quantity }) => issueRow(acc, row, quantity), prev));
+  async function handleBulkIssue(entries) {
+    const result = await setItems(
+      (prev) => entries.reduce((acc, { row, quantity }) => issueRow(acc, row, quantity), prev),
+      cipTasksByItemNo(
+        entries.map(({ row, quantity }) => ({ itemNo: row.itemNo, quantity: quantity ?? row.quantity })),
+        "issue"
+      )
+    );
+    if (!result.ok) {
+      window.alert(result.error);
+      return;
+    }
     logOperation(
       entries.map(({ row, quantity }) => {
         const item = items.find((it) => it.itemNo === row.itemNo);
