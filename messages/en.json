@@ -276,8 +276,24 @@
     "subtitle": "Orders placed to the main warehouse. Demo data - CIP integration is coming soon.",
     "count": "Items: {count}",
     "emptyStatus": "No orders match the search.",
+    "newOrder": "New order",
+    "types": {
+      "water_refill": "Water refill",
+      "material_order": "Material order",
+      "spool_order": "Spool order",
+      "goods_transport": "Semi-finished goods transport",
+      "waste_removal": "Waste removal",
+      "warehouse_return": "Return to warehouse"
+    },
+    "details": {
+      "water": "Water type",
+      "clean": "Clean",
+      "dirty": "Dirty",
+      "productionOrderNo": "Production order no."
+    },
     "columns": {
       "orderNo": "Order number",
+      "type": "Type",
       "status": "Status",
       "line": "Line",
       "employeeNo": "Ordered by",
@@ -292,10 +308,14 @@
       "cancelled": "Cancelled"
     },
     "newOrderPanel": {
-      "trigger": "Order",
-      "title": "New order",
-      "lineLabel": "Line",
+      "titleFor": "New order: {type}",
       "linePlaceholder": "Select a line",
+      "fields": {
+        "to": "Deliver to",
+        "from": "From",
+        "place": "Place",
+        "collectFrom": "Collect from"
+      },
       "addItemLabel": "Add material",
       "addItemPlaceholder": "Search by number or name...",
       "noMatches": "No matches",

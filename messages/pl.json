@@ -276,8 +276,24 @@
     "subtitle": "Zamówienia złożone do magazynu głównego. Dane demonstracyjne - integracja z CIP jest w przygotowaniu.",
     "count": "Pozycji: {count}",
     "emptyStatus": "Brak zamówień spełniających kryteria wyszukiwania.",
+    "newOrder": "Nowe zamówienie",
+    "types": {
+      "water_refill": "Dolewanie wody",
+      "material_order": "Zamówienie materiału",
+      "spool_order": "Zamówienie szpul",
+      "goods_transport": "Transport półproduktów",
+      "waste_removal": "Wywożenie odpadu",
+      "warehouse_return": "Zwrot na magazyn"
+    },
+    "details": {
+      "water": "Rodzaj wody",
+      "clean": "Czysta",
+      "dirty": "Brudna",
+      "productionOrderNo": "Nr zamówienia produkcyjnego"
+    },
     "columns": {
       "orderNo": "Numer zamówienia",
+      "type": "Typ",
       "status": "Status",
       "line": "Linia",
       "employeeNo": "Zamawiający",
@@ -292,10 +308,14 @@
       "cancelled": "Anulowane"
     },
     "newOrderPanel": {
-      "trigger": "Zamów",
-      "title": "Nowe zamówienie",
-      "lineLabel": "Linia",
+      "titleFor": "Nowe zamówienie: {type}",
       "linePlaceholder": "Wybierz linię",
+      "fields": {
+        "to": "Dokąd dostarczyć",
+        "from": "Skąd",
+        "place": "Miejsce",
+        "collectFrom": "Skąd odebrać"
+      },
       "addItemLabel": "Dodaj materiał",
       "addItemPlaceholder": "Szukaj po numerze lub nazwie...",
       "noMatches": "Brak wyników",

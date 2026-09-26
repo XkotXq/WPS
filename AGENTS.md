@@ -217,8 +217,11 @@ Known gotchas worth knowing before editing:
 ## Zamówienia (orders) - current state
 "Lista zamówień" (`components/OrdersCipListTable.js`) is a local-only demo on
 `lib/ordersCipSeed.js` (component state, no backend): one flat table, status
-as a badge, a "Zamów" dialog (line picked from the fixed line codes, materials
-searched in `sm_catalog` with the unit read from it). "Historia zamówień",
+as a badge and a "Typ" column, and one "Nowe zamówienie" button that opens a
+menu of the order types; the chosen type opens a centered dialog with just that
+type's inputs (`ORDER_TYPES` in the component: line pickers from the fixed line
+codes, clean/dirty water, production order number, materials searched in
+`sm_catalog` with the unit read from it). No photo field until storage is decided. "Historia zamówień",
 "Wytyczne do zamówień" and "Raporty" are placeholders. The real data model
 (transport orders of six types, order numbers, shifts A/B/C, photos), the
 decisions taken and the roadmap (JWT auth -> Hasura -> these screens on Hasura)

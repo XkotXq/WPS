@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import FrpFilters from "@/components/FrpFilters";
 import { ORDERS_CIP_SEED } from "@/lib/ordersCipSeed";
@@ -22,6 +23,26 @@ const LINE_CODES = [
   "FC03",
   "FL01",
 ];
+
+// What each type of order asks for - the "Nowe zamówienie" menu lists these in
+// this order. `from`/`to` are line codes (the only places there are), `water`
+// is the clean/dirty choice, `productionOrderNo` the one production order the
+// whole order is filled under, `items` a list of catalog materials with a
+// quantity. Mirrors wpsApi's src/orders.draft.sql (see its AGENTS.md); the
+// inputs per type are still being decided, so this is the one place to change.
+// "Zamówienie szpul" has no agreed inputs yet - it asks like a material order,
+// minus the production order number.
+const ORDER_TYPES = [
+  { code: "water_refill", fields: ["to", "water"] },
+  { code: "material_order", fields: ["to", "productionOrderNo", "items"] },
+  { code: "spool_order", fields: ["to", "items"] },
+  { code: "goods_transport", fields: ["from", "to"] },
+  { code: "waste_removal", fields: ["from"] },
+  { code: "warehouse_return", fields: ["from"] },
+];
+
+// The "from" line is asked differently per type.
+const FROM_LABEL_KEY = { goods_transport: "from", waste_removal: "place", warehouse_return: "collectFrom" };
 
 const FIELD_CLS =
   "h-10 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 focus:border-navy-700 dark:focus:border-navy-400 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400";
@@ -42,14 +63,34 @@ function nextOrderNo(existingOrders) {
   return `ZM/${year}/${String(highest + 1).padStart(4, "0")}`;
 }
 
-// "Zamów": pick a line, then add materials one at a time by searching the
-// same reference catalog Materiały SM uses (sm_catalog, via smCatalogApi) -
-// its unit comes along for free instead of the operator having to know it
-// by heart. Local-only, same as the rest of this table (see the
-// component's own comment) - onCreate just prepends a plain order object,
-// no backend call.
-function NewOrderPanel({ open, onOpenChange, onCreate, t }) {
-  const [line, setLine] = useState("");
+// "Skąd → dokąd" when an order has both, else the one line it concerns.
+function routeLabel(order) {
+  if (order.from && order.to) return `${order.from} → ${order.to}`;
+  return order.line ?? order.to ?? order.from ?? "-";
+}
+
+// Type-specific values worth showing under an expanded order.
+function detailLines(order, t) {
+  const lines = [];
+  if (order.details?.water) lines.push(`${t("details.water")}: ${t(order.details.water === "clean" ? "details.clean" : "details.dirty")}`);
+  if (order.details?.productionOrderNo) lines.push(`${t("details.productionOrderNo")}: ${order.details.productionOrderNo}`);
+  return lines;
+}
+
+const EMPTY_FORM = { from: "", to: "", water: "", productionOrderNo: "" };
+
+// "Nowe zamówienie": the form of one order type (see ORDER_TYPES). Materials
+// are added one at a time by searching the same reference catalog Materiały SM
+// uses (sm_catalog, via smCatalogApi) - the unit comes along for free instead
+// of the operator having to know it. Local-only, same as the rest of this
+// table (see the component's own comment) - onCreate just prepends a plain
+// order object, no backend call. No photo field yet: where photos are stored
+// is undecided (see wpsApi's AGENTS.md).
+function NewOrderPanel({ type, onClose, onCreate, t }) {
+  const config = ORDER_TYPES.find((entry) => entry.code === type) ?? ORDER_TYPES[0];
+  const has = (field) => config.fields.includes(field);
+  const open = Boolean(type);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [catalog, setCatalog] = useState([]);
   const [rows, setRows] = useState([]);
   const [itemSearch, setItemSearch] = useState("");
@@ -57,20 +98,22 @@ function NewOrderPanel({ open, onOpenChange, onCreate, t }) {
 
   useEffect(() => {
     if (!open) return;
-    setLine("");
+    setForm(EMPTY_FORM);
     setRows([]);
     setItemSearch("");
     setPickerOpen(false);
-  }, [open]);
+  }, [open, type]);
 
-  // Fetched fresh every time the panel opens (not cached at the page level,
-  // unlike Materiały SM's own copy of this same list) - this panel is opened
-  // rarely enough that a stale catalog from earlier in the session isn't
-  // worth the extra prop plumbing.
+  // Fetched fresh every time a materials form opens (not cached at the page
+  // level, unlike Materiały SM's own copy of this same list) - this panel is
+  // opened rarely enough that a stale catalog from earlier in the session
+  // isn't worth the extra prop plumbing.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !has("items")) return;
     smCatalogApi.list().then(setCatalog).catch(() => {});
-  }, [open]);
+  }, [open, type]);
+
+  const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   const matches = useMemo(() => {
     const needle = itemSearch.trim().toLowerCase();
@@ -96,87 +139,143 @@ function NewOrderPanel({ open, onOpenChange, onCreate, t }) {
   }
 
   const validRows = rows.filter((row) => parseFloat(row.quantity) > 0);
-  const canSubmit = Boolean(line) && validRows.length > 0;
+  const canSubmit =
+    (!has("to") || Boolean(form.to)) &&
+    (!has("from") || Boolean(form.from)) &&
+    (!(has("from") && has("to")) || form.from !== form.to) &&
+    (!has("water") || Boolean(form.water)) &&
+    (!has("productionOrderNo") || Boolean(form.productionOrderNo.trim())) &&
+    (!has("items") || validRows.length > 0);
 
   async function handleSubmit() {
     if (!canSubmit) return;
     const session = await getCipSession().catch(() => null);
+    const details = {};
+    if (has("water")) details.water = form.water;
+    if (has("productionOrderNo")) details.productionOrderNo = form.productionOrderNo.trim();
     onCreate({
-      line,
+      type: config.code,
+      from: has("from") ? form.from : null,
+      to: has("to") ? form.to : null,
+      details,
       employeeNo: session?.userId ?? "",
-      items: validRows.map((row) => ({ itemNo: row.itemNo, itemName: row.itemName, quantity: row.quantity, note: "-" })),
+      items: has("items")
+        ? validRows.map((row) => ({ itemNo: row.itemNo, itemName: row.itemName, quantity: row.quantity, unit: row.unit, note: "-" }))
+        : [],
     });
-    onOpenChange(false);
+    onClose();
   }
 
+  const lineSelect = (field, label) => (
+    <label className="flex flex-col gap-1">
+      <span className={LABEL_CLS}>
+        {label}
+        <RequiredMark />
+      </span>
+      <select className={FIELD_CLS} value={form[field]} onChange={(e) => setField(field, e.target.value)}>
+        <option value="">{t("newOrderPanel.linePlaceholder")}</option>
+        {LINE_CODES.map((code) => (
+          <option key={code} value={code}>
+            {code}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("newOrderPanel.title")}</DialogTitle>
+          <DialogTitle>{t("newOrderPanel.titleFor", { type: t(`types.${config.code}`) })}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLS}>
-              {t("newOrderPanel.lineLabel")}
-              <RequiredMark />
-            </span>
-            <select className={FIELD_CLS} value={line} onChange={(e) => setLine(e.target.value)}>
-              <option value="">{t("newOrderPanel.linePlaceholder")}</option>
-              {LINE_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
-          </label>
+          {has("from") && lineSelect("from", t(`newOrderPanel.fields.${FROM_LABEL_KEY[config.code] ?? "from"}`))}
+          {has("to") && lineSelect("to", t("newOrderPanel.fields.to"))}
 
-          <label className="relative flex flex-col gap-1">
-            <span className={LABEL_CLS}>{t("newOrderPanel.addItemLabel")}</span>
-            <input
-              className={FIELD_CLS}
-              value={itemSearch}
-              onChange={(e) => {
-                setItemSearch(e.target.value);
-                setPickerOpen(true);
-              }}
-              onFocus={() => setPickerOpen(true)}
-              onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
-              placeholder={t("newOrderPanel.addItemPlaceholder")}
-            />
-            {pickerOpen && itemSearch.trim() && (
-              <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-                {matches.length === 0 ? (
-                  <p className="px-3 py-2 text-sm text-gray-400 dark:text-neutral-500">{t("newOrderPanel.noMatches")}</p>
-                ) : (
-                  matches.map((entry) => (
-                    <button
-                      key={entry.itemNo}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => addItem(entry)}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-neutral-800"
-                    >
-                      <span className="truncate">
-                        <span className="font-medium text-gray-900 dark:text-neutral-100">{entry.itemName}</span>
-                        <span className="ml-1.5 text-gray-400 dark:text-neutral-500">{entry.itemNo}</span>
-                      </span>
-                      {entry.unit && <span className="shrink-0 text-xs text-gray-400 dark:text-neutral-500">{entry.unit}</span>}
-                    </button>
-                  ))
-                )}
+          {has("water") && (
+            <div className="flex flex-col gap-1">
+              <span className={LABEL_CLS}>
+                {t("details.water")}
+                <RequiredMark />
+              </span>
+              <div className="inline-flex items-center gap-1 self-start rounded-lg border border-gray-200 bg-gray-100 p-1 dark:border-neutral-700 dark:bg-neutral-800">
+                {["clean", "dirty"].map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => setField("water", kind)}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      form.water === kind
+                        ? "bg-white text-navy-950 shadow-sm dark:bg-neutral-900 dark:text-white"
+                        : "text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    {t(`details.${kind}`)}
+                  </button>
+                ))}
               </div>
-            )}
-          </label>
+            </div>
+          )}
 
-          {rows.length > 0 && (
+          {has("productionOrderNo") && (
+            <label className="flex flex-col gap-1">
+              <span className={LABEL_CLS}>
+                {t("details.productionOrderNo")}
+                <RequiredMark />
+              </span>
+              <input className={FIELD_CLS} value={form.productionOrderNo} onChange={(e) => setField("productionOrderNo", e.target.value)} />
+            </label>
+          )}
+
+          {has("items") && (
+            <label className="relative flex flex-col gap-1">
+              <span className={LABEL_CLS}>
+                {t("newOrderPanel.addItemLabel")}
+                <RequiredMark />
+              </span>
+              <input
+                className={FIELD_CLS}
+                value={itemSearch}
+                onChange={(e) => {
+                  setItemSearch(e.target.value);
+                  setPickerOpen(true);
+                }}
+                onFocus={() => setPickerOpen(true)}
+                onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
+                placeholder={t("newOrderPanel.addItemPlaceholder")}
+              />
+              {pickerOpen && itemSearch.trim() && (
+                <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                  {matches.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-400 dark:text-neutral-500">{t("newOrderPanel.noMatches")}</p>
+                  ) : (
+                    matches.map((entry) => (
+                      <button
+                        key={entry.itemNo}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => addItem(entry)}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-neutral-800"
+                      >
+                        <span className="truncate">
+                          <span className="font-medium text-gray-900 dark:text-neutral-100">{entry.itemName}</span>
+                          <span className="ml-1.5 text-gray-400 dark:text-neutral-500">{entry.itemNo}</span>
+                        </span>
+                        {entry.unit && <span className="shrink-0 text-xs text-gray-400 dark:text-neutral-500">{entry.unit}</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </label>
+          )}
+
+          {has("items") && rows.length > 0 && (
             <div className="flex flex-col gap-1">
               {rows.map((row) => (
-                <div
-                  key={row.itemNo}
-                  className="flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-neutral-800/50 px-3 py-1.5 text-sm"
-                >
+                <div key={row.itemNo} className="flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-neutral-800/50 px-3 py-1.5 text-sm">
                   <div className="flex-1 truncate">
                     <span className="font-medium text-gray-900 dark:text-neutral-100">{row.itemName}</span>
                     <span className="ml-1.5 text-gray-400 dark:text-neutral-500">{row.itemNo}</span>
@@ -205,7 +304,7 @@ function NewOrderPanel({ open, onOpenChange, onCreate, t }) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" size="sm" onClick={onClose}>
             {t("newOrderPanel.cancel")}
           </Button>
           <Button size="sm" onClick={handleSubmit} disabled={!canSubmit}>
@@ -250,14 +349,14 @@ const CELL_CLS = "text-gray-600 dark:text-neutral-300";
 // fields (status/line/employeeNo) share nothing with its line items'
 // (itemNo/itemName/quantity), so this instead mirrors SmMaterialsPanel's
 // own hand-rolled groupParent/groupChild expand pattern: a chevron toggles
-// each order row open to reveal its ordered items indented underneath,
-// same tree-line treatment.
+// each order row open to reveal what it holds (its type-specific values and
+// its ordered items) indented underneath, same tree-line treatment.
 export default function OrdersCipListTable() {
   const t = useTranslations("ordersCip");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState({});
   const [ordersData, setOrdersData] = useState(ORDERS_CIP_SEED);
-  const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [newOrderType, setNewOrderType] = useState(null);
 
   function toggle(orderNo) {
     setExpanded((prev) => ({ ...prev, [orderNo]: !prev[orderNo] }));
@@ -266,13 +365,17 @@ export default function OrdersCipListTable() {
   // New order goes straight to "new"/onto the top of the list - same
   // local-only concept as the rest of this table (see its own comment),
   // no backend call.
-  function handleCreateOrder({ line, employeeNo, items }) {
+  function handleCreateOrder({ type, from, to, details, employeeNo, items }) {
     const orderNo = nextOrderNo(ordersData);
     const order = {
       id: orderNo,
       orderNo,
+      type,
       status: "new",
-      line,
+      line: to ?? from,
+      from,
+      to,
+      details,
       employeeNo,
       fulfilledBy: "-",
       createdAt: new Date().toISOString(),
@@ -286,7 +389,7 @@ export default function OrdersCipListTable() {
     if (!search) return ordersData;
     const needle = search.toLowerCase();
     return ordersData.filter((order) =>
-      [order.orderNo, order.line, order.employeeNo, order.note, t(`status.${order.status}`)].some((field) =>
+      [order.orderNo, t(`types.${order.type}`), routeLabel(order), order.employeeNo, order.note, t(`status.${order.status}`)].some((field) =>
         field?.toLowerCase().includes(needle)
       )
     );
@@ -296,13 +399,27 @@ export default function OrdersCipListTable() {
     <div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: orders.length })}</p>
-        <Button size="sm" className="gap-1.5" onClick={() => setNewOrderOpen(true)}>
-          <Plus className="h-4 w-4" />
-          {t("newOrderPanel.trigger")}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button size="sm" className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                {t("newOrder")}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            {ORDER_TYPES.map((entry) => (
+              <DropdownMenuItem key={entry.code} onClick={() => setNewOrderType(entry.code)}>
+                {t(`types.${entry.code}`)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <NewOrderPanel open={newOrderOpen} onOpenChange={setNewOrderOpen} onCreate={handleCreateOrder} t={t} />
+      <NewOrderPanel type={newOrderType} onClose={() => setNewOrderType(null)} onCreate={handleCreateOrder} t={t} />
 
       <div className="mt-4">
         <FrpFilters onGlobalFilterChange={setSearch} />
@@ -313,6 +430,7 @@ export default function OrdersCipListTable() {
               <TableRow className="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800">
                 <TableHead className={`w-8 ${HEAD_CLS}`} />
                 <TableHead className={`pl-0 ${HEAD_CLS}`}>{t("columns.orderNo")}</TableHead>
+                <TableHead className={HEAD_CLS}>{t("columns.type")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.status")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.line")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.employeeNo")}</TableHead>
@@ -324,35 +442,52 @@ export default function OrdersCipListTable() {
             <TableBody>
               {orders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
+                  <TableCell colSpan={9} className="py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
                     {t("emptyStatus")}
                   </TableCell>
                 </TableRow>
               )}
               {orders.map((order) => {
-                const isOpen = Boolean(expanded[order.orderNo]);
+                const details = detailLines(order, t);
+                const items = order.items ?? [];
+                const expandable = details.length > 0 || items.length > 0;
+                const isOpen = expandable && Boolean(expanded[order.orderNo]);
                 return (
                   <Fragment key={order.orderNo}>
-                    <TableRow onClick={() => toggle(order.orderNo)} className="cursor-pointer">
+                    <TableRow onClick={expandable ? () => toggle(order.orderNo) : undefined} className={expandable ? "cursor-pointer" : undefined}>
                       <TableCell className="w-8 pl-4">
-                        {isOpen ? (
-                          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                        ) : (
-                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                        )}
+                        {expandable &&
+                          (isOpen ? (
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                          ))}
                       </TableCell>
                       <TableCell className={`pl-0 font-medium ${CELL_CLS}`}>{order.orderNo}</TableCell>
+                      <TableCell className={CELL_CLS}>{t(`types.${order.type}`)}</TableCell>
                       <TableCell>
                         <StatusBadge status={order.status} />
                       </TableCell>
-                      <TableCell className={CELL_CLS}>{order.line}</TableCell>
+                      <TableCell className={CELL_CLS}>{routeLabel(order)}</TableCell>
                       <TableCell className={CELL_CLS}>{order.employeeNo}</TableCell>
                       <TableCell className={CELL_CLS}>{order.fulfilledBy}</TableCell>
                       <TableCell className={CELL_CLS}>{formatDateTime(order.createdAt)}</TableCell>
                       <TableCell className={`pr-4 ${CELL_CLS}`}>{order.note}</TableCell>
                     </TableRow>
+                    {isOpen && details.length > 0 && (
+                      <TableRow className="bg-gray-50/60 dark:bg-neutral-900/40">
+                        <TableCell className="relative w-8 pl-4">
+                          <span className="absolute inset-y-0 left-6 flex w-3.5 justify-center">
+                            <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
+                          </span>
+                        </TableCell>
+                        <TableCell colSpan={8} className={`pl-2 pr-4 ${CELL_CLS}`}>
+                          {details.join(" · ")}
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {isOpen &&
-                      order.items.map((item) => (
+                      items.map((item) => (
                         <TableRow key={`${order.orderNo}-${item.itemNo}`} className="bg-gray-50/60 dark:bg-neutral-900/40">
                           <TableCell className="relative w-8 pl-4">
                             <span className="absolute inset-y-0 left-6 flex w-3.5 justify-center">
@@ -363,8 +498,11 @@ export default function OrdersCipListTable() {
                           <TableCell colSpan={2} className={CELL_CLS}>
                             {item.itemName}
                           </TableCell>
-                          <TableCell className={`tabular-nums ${CELL_CLS}`}>{item.quantity}</TableCell>
-                          <TableCell colSpan={3} className={`pr-4 text-gray-400 dark:text-neutral-500`}>
+                          <TableCell className={`tabular-nums ${CELL_CLS}`}>
+                            {item.quantity}
+                            {item.unit ? ` ${item.unit}` : ""}
+                          </TableCell>
+                          <TableCell colSpan={4} className={`pr-4 text-gray-400 dark:text-neutral-500`}>
                             {item.note}
                           </TableCell>
                         </TableRow>
