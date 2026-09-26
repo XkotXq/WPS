@@ -320,7 +320,6 @@
       },
       "notePlaceholder": "Opcjonalnie - np. dodatkowe informacje dla wózkowego",
       "locationPlaceholder": "Wybierz lub wpisz",
-      "locationHint": "Nowa lokalizacja zapisze się z zamówieniem i będzie podpowiadana przy kolejnych.",
       "addItemLabel": "Dodaj materiał",
       "addItemPlaceholder": "Szukaj po numerze lub nazwie...",
       "noMatches": "Brak wyników",
