@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { ArrowRight, Cable, ChevronDown, ChevronRight, Droplets, Package, Plus, Trash2, Truck, Undo2, X } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Cable, ChevronDown, ChevronRight, Droplets, ImagePlus, Package, Plus, Trash2, Truck, Undo2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,7 +26,8 @@ const LINE_CODES = [
 
 // What each type of order asks for - the "Nowe zamówienie" menu lists these in
 // this order. `from`/`to` are line codes (the only places there are), `water`
-// is the clean/dirty choice, `productionOrderNo` the one production order the
+// is the clean/dirty choice, `photo` one optional picture picked from the computer,
+// `productionOrderNo` the one production order the
 // whole order is filled under, `items` a list of catalog materials with a
 // quantity. Mirrors wpsApi's src/orders.draft.sql (see its AGENTS.md); the
 // inputs per type are still being decided, so this is the one place to change.
@@ -41,9 +42,9 @@ const ORDER_TYPES = [
   { code: "water_refill", fields: ["to", "water"], icon: Droplets, iconTone: "text-blue-600! dark:text-blue-400!" },
   { code: "material_order", fields: ["to", "productionOrderNo", "items"], icon: Package, iconTone: "text-pink-600! dark:text-pink-400!" },
   { code: "spool_order", fields: ["to", "items"], icon: Cable, iconTone: "text-gray-600! dark:text-neutral-300!" },
-  { code: "goods_transport", fields: ["from", "to"], freeText: true, icon: Truck, iconTone: "text-orange-600! dark:text-orange-400!" },
-  { code: "waste_removal", fields: ["from"], icon: Trash2, iconTone: "text-yellow-600! dark:text-yellow-400!" },
-  { code: "warehouse_return", fields: ["from"], icon: Undo2, iconTone: "text-green-600! dark:text-green-400!" },
+  { code: "goods_transport", fields: ["from", "to", "photo"], freeText: true, icon: Truck, iconTone: "text-orange-600! dark:text-orange-400!" },
+  { code: "waste_removal", fields: ["from", "photo"], icon: Trash2, iconTone: "text-yellow-600! dark:text-yellow-400!" },
+  { code: "warehouse_return", fields: ["from", "photo"], icon: Undo2, iconTone: "text-green-600! dark:text-green-400!" },
 ];
 
 // `freeText`: "skąd"/"dokąd" are not limited to the production lines - they
@@ -147,7 +148,11 @@ const EMPTY_FORM = { from: "", to: "", water: "", productionOrderNo: "", note: "
 // order object, no backend call. No photo field yet: where photos are stored
 // is undecided (see wpsApi's AGENTS.md).
 function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
-  const config = ORDER_TYPES.find((entry) => entry.code === type) ?? ORDER_TYPES[0];
+  // While the dialog fades out `type` is already null - keep showing the type it
+  // had, or the fading form would flash the first type's fields.
+  const shownType = useRef(type);
+  if (type) shownType.current = type;
+  const config = ORDER_TYPES.find((entry) => entry.code === (type ?? shownType.current)) ?? ORDER_TYPES[0];
   const has = (field) => config.fields.includes(field);
   const open = Boolean(type);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -155,6 +160,10 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
   const [rows, setRows] = useState([]);
   const [itemSearch, setItemSearch] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // { name, url } - url is a blob: URL of the picked file, only living in this
+  // browser tab (no upload: where photos are stored is undecided).
+  const [photo, setPhoto] = useState(null);
+  const [photoError, setPhotoError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -162,7 +171,35 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
     setRows([]);
     setItemSearch("");
     setPickerOpen(false);
+    setPhotoError("");
+    // A photo picked but never sent is let go of; a sent one was handed to the
+    // order and this state cleared, so it is not revoked here.
+    setPhoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
   }, [open, type]);
+
+  function pickPhoto(file) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError(t("newOrderPanel.photo.notImage"));
+      return;
+    }
+    setPhotoError("");
+    setPhoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return { name: file.name, url: URL.createObjectURL(file) };
+    });
+  }
+
+  function removePhoto() {
+    setPhotoError("");
+    setPhoto((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  }
 
   // Fetched fresh every time a materials form opens (not cached at the page
   // level, unlike Materiały SM's own copy of this same list) - this panel is
@@ -222,11 +259,13 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
       to: has("to") ? canonical(form.to) : null,
       details,
       note: form.note.trim(),
+      photo: has("photo") ? photo : null,
       employeeNo: session?.userId ?? "",
       items: has("items")
         ? validRows.map((row) => ({ itemNo: row.itemNo, itemName: row.itemName, quantity: row.quantity, unit: row.unit, note: "-" }))
         : [],
     });
+    setPhoto(null); // now owned by the order
     onClose();
   }
 
@@ -394,6 +433,48 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
             </div>
           )}
 
+          {has("photo") && (
+            <div className="flex flex-col gap-1">
+              <span className={LABEL_CLS}>{t("newOrderPanel.photo.label")}</span>
+              {photo ? (
+                <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-2 dark:border-neutral-700">
+                  <img src={photo.url} alt={photo.name} className="h-16 w-16 shrink-0 rounded-md object-cover" />
+                  <span className="flex-1 truncate text-sm text-gray-700 dark:text-neutral-200">{photo.name}</span>
+                  <button
+                    type="button"
+                    onClick={removePhoto}
+                    title={t("newOrderPanel.photo.remove")}
+                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    pickPhoto(e.dataTransfer.files?.[0]);
+                  }}
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 hover:bg-gray-50 dark:border-neutral-600 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                >
+                  <ImagePlus className="h-4 w-4 shrink-0" />
+                  {t("newOrderPanel.photo.add")}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      pickPhoto(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+              {photoError && <p className="text-xs text-red-600 dark:text-red-400">{photoError}</p>}
+            </div>
+          )}
+
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLS}>{t("newOrderPanel.fields.note")}</span>
             <textarea
@@ -467,7 +548,7 @@ export default function OrdersCipListTable() {
   // New order goes straight to "new"/onto the top of the list - same
   // local-only concept as the rest of this table (see its own comment),
   // no backend call.
-  function handleCreateOrder({ type, from, to, details, note, employeeNo, items }) {
+  function handleCreateOrder({ type, from, to, details, note, photo, employeeNo, items }) {
     const orderNo = nextOrderNo(ordersData);
     const order = {
       id: orderNo,
@@ -482,6 +563,7 @@ export default function OrdersCipListTable() {
       fulfilledBy: "-",
       createdAt: new Date().toISOString(),
       note: note || "-",
+      photo,
       items,
     };
     setOrdersData((prev) => [order, ...prev]);
@@ -565,7 +647,7 @@ export default function OrdersCipListTable() {
               {orders.map((order) => {
                 const details = detailLines(order, t);
                 const items = order.items ?? [];
-                const expandable = details.length > 0 || items.length > 0;
+                const expandable = details.length > 0 || items.length > 0 || Boolean(order.photo);
                 const isOpen = expandable && Boolean(expanded[order.orderNo]);
                 return (
                   <Fragment key={order.orderNo}>
@@ -598,6 +680,20 @@ export default function OrdersCipListTable() {
                         </TableCell>
                         <TableCell colSpan={8} className={`pl-2 pr-4 ${CELL_CLS}`}>
                           {details.join(" · ")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {isOpen && order.photo && (
+                      <TableRow className="bg-gray-50/60 dark:bg-neutral-900/40">
+                        <TableCell className="relative w-8 pl-4">
+                          <span className="absolute inset-y-0 left-6 flex w-3.5 justify-center">
+                            <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
+                          </span>
+                        </TableCell>
+                        <TableCell colSpan={8} className="py-2 pl-2 pr-4">
+                          <a href={order.photo.url} target="_blank" rel="noreferrer" title={order.photo.name} className="inline-block">
+                            <img src={order.photo.url} alt={order.photo.name} className="h-20 rounded-md border border-gray-200 object-cover dark:border-neutral-700" />
+                          </a>
                         </TableCell>
                       </TableRow>
                     )}

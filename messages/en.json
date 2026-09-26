@@ -320,6 +320,12 @@
       },
       "notePlaceholder": "Optional - e.g. extra information for the forklift operator",
       "locationPlaceholder": "Pick or type",
+      "photo": {
+        "label": "Photo",
+        "add": "Add a photo from your computer (click or drag)",
+        "remove": "Remove photo",
+        "notImage": "Choose an image file (e.g. JPG or PNG)."
+      },
       "addItemLabel": "Add material",
       "addItemPlaceholder": "Search by number or name...",
       "noMatches": "No matches",

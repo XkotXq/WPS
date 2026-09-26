@@ -223,7 +223,9 @@ type's inputs (`ORDER_TYPES` in the component: line pickers from the fixed line
 codes (for "Transport półproduktów": suggestions from every place known so far, any
 typed text accepted and remembered - `LocationInput`), clean/dirty water, production
 order number, materials searched in
-`sm_catalog` with the unit read from it). No photo field until storage is decided. "Historia zamówień",
+`sm_catalog` with the unit read from it), and for transport / waste / return one optional
+photo picked from the computer (click or drag; kept only as a blob URL in the browser tab -
+nothing is uploaded until storage is decided; shown as a thumbnail when the order is expanded). "Historia zamówień",
 "Wytyczne do zamówień" and "Raporty" are placeholders. The real data model
 (transport orders of six types, order numbers, shifts A/B/C, photos), the
 decisions taken and the roadmap (JWT auth -> Hasura -> these screens on Hasura)
