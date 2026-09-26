@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, X } from "lucide-react";
+import { Cable, ChevronDown, ChevronRight, Droplets, Package, Plus, Trash2, Truck, Undo2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -32,13 +32,18 @@ const LINE_CODES = [
 // inputs per type are still being decided, so this is the one place to change.
 // "Zamówienie szpul" has no agreed inputs yet - it asks like a material order,
 // minus the production order number.
+// `icon`/`iconTone` are only for the menu: each type has its own icon and
+// colour (blue, pink, gray, orange, yellow, green from top to bottom), the icon
+// alone with no background. The colour carries a trailing "!" (Tailwind v4
+// important) because a focused menu item recolours all its descendants, which
+// would otherwise wipe it out on hover.
 const ORDER_TYPES = [
-  { code: "water_refill", fields: ["to", "water"] },
-  { code: "material_order", fields: ["to", "productionOrderNo", "items"] },
-  { code: "spool_order", fields: ["to", "items"] },
-  { code: "goods_transport", fields: ["from", "to"] },
-  { code: "waste_removal", fields: ["from"] },
-  { code: "warehouse_return", fields: ["from"] },
+  { code: "water_refill", fields: ["to", "water"], icon: Droplets, iconTone: "text-blue-600! dark:text-blue-400!" },
+  { code: "material_order", fields: ["to", "productionOrderNo", "items"], icon: Package, iconTone: "text-pink-600! dark:text-pink-400!" },
+  { code: "spool_order", fields: ["to", "items"], icon: Cable, iconTone: "text-gray-600! dark:text-neutral-300!" },
+  { code: "goods_transport", fields: ["from", "to"], icon: Truck, iconTone: "text-orange-600! dark:text-orange-400!" },
+  { code: "waste_removal", fields: ["from"], icon: Trash2, iconTone: "text-yellow-600! dark:text-yellow-400!" },
+  { code: "warehouse_return", fields: ["from"], icon: Undo2, iconTone: "text-green-600! dark:text-green-400!" },
 ];
 
 // The "from" line is asked differently per type.
@@ -409,10 +414,12 @@ export default function OrdersCipListTable() {
               </Button>
             }
           />
-          <DropdownMenuContent align="end">
-            {ORDER_TYPES.map((entry) => (
-              <DropdownMenuItem key={entry.code} onClick={() => setNewOrderType(entry.code)}>
-                {t(`types.${entry.code}`)}
+          {/* Wide enough for every type name on one line. */}
+          <DropdownMenuContent align="end" className="min-w-64">
+            {ORDER_TYPES.map(({ code, icon: Icon, iconTone }) => (
+              <DropdownMenuItem key={code} onClick={() => setNewOrderType(code)} className="gap-2.5 whitespace-nowrap py-1.5">
+                <Icon className={`h-4 w-4 ${iconTone}`} />
+                {t(`types.${code}`)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
