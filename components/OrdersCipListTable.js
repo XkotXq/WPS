@@ -41,11 +41,14 @@ const ORDER_TYPES = [
   { code: "water_refill", fields: ["to", "water"], icon: Droplets, iconTone: "text-blue-600! dark:text-blue-400!" },
   { code: "material_order", fields: ["to", "productionOrderNo", "items"], icon: Package, iconTone: "text-pink-600! dark:text-pink-400!" },
   { code: "spool_order", fields: ["to", "items"], icon: Cable, iconTone: "text-gray-600! dark:text-neutral-300!" },
-  { code: "goods_transport", fields: ["from", "to"], icon: Truck, iconTone: "text-orange-600! dark:text-orange-400!" },
+  { code: "goods_transport", fields: ["from", "to"], freeText: true, icon: Truck, iconTone: "text-orange-600! dark:text-orange-400!" },
   { code: "waste_removal", fields: ["from"], icon: Trash2, iconTone: "text-yellow-600! dark:text-yellow-400!" },
   { code: "warehouse_return", fields: ["from"], icon: Undo2, iconTone: "text-green-600! dark:text-green-400!" },
 ];
 
+// `freeText`: "skąd"/"dokąd" are not limited to the production lines - they
+// suggest every place known so far (the fixed lines plus any typed on an earlier
+// order) and accept a new one, which then joins the suggestions.
 // The "from" line is asked differently per type.
 const FROM_LABEL_KEY = { goods_transport: "from", waste_removal: "place", warehouse_return: "collectFrom" };
 
@@ -82,6 +85,59 @@ function detailLines(order, t) {
   return lines;
 }
 
+// A place field with suggestions: the shared pool of every place known so far
+// (same list for everyone - not personalised), filtered by what is typed, and any
+// other text is accepted as it is (a new place - it is saved with the order and
+// suggested from then on). Suggestions come from `locations` (see NewOrderPanel).
+function LocationInput({ label, value, onChange, locations, t }) {
+  const [open, setOpen] = useState(false);
+  const needle = value.trim().toLowerCase();
+  const matches = useMemo(
+    () => locations.filter((name) => !needle || name.toLowerCase().includes(needle)).slice(0, 8),
+    [locations, needle]
+  );
+  const isNew = needle !== "" && !locations.some((name) => name.toLowerCase() === needle);
+
+  return (
+    <label className="relative flex flex-col gap-1">
+      <span className={LABEL_CLS}>
+        {label}
+        <RequiredMark />
+      </span>
+      <input
+        className={FIELD_CLS}
+        value={value}
+        placeholder={t("newOrderPanel.locationPlaceholder")}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+          {matches.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(name);
+                setOpen(false);
+              }}
+              className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-50 dark:text-neutral-100 dark:hover:bg-neutral-800"
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+      {isNew && <span className="text-xs text-gray-400 dark:text-neutral-500">{t("newOrderPanel.locationHint")}</span>}
+    </label>
+  );
+}
+
 const EMPTY_FORM = { from: "", to: "", water: "", productionOrderNo: "", note: "" };
 
 // "Nowe zamówienie": the form of one order type (see ORDER_TYPES). Materials
@@ -91,7 +147,7 @@ const EMPTY_FORM = { from: "", to: "", water: "", productionOrderNo: "", note: "
 // table (see the component's own comment) - onCreate just prepends a plain
 // order object, no backend call. No photo field yet: where photos are stored
 // is undecided (see wpsApi's AGENTS.md).
-function NewOrderPanel({ type, onClose, onCreate, t }) {
+function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
   const config = ORDER_TYPES.find((entry) => entry.code === type) ?? ORDER_TYPES[0];
   const has = (field) => config.fields.includes(field);
   const open = Boolean(type);
@@ -145,9 +201,9 @@ function NewOrderPanel({ type, onClose, onCreate, t }) {
 
   const validRows = rows.filter((row) => parseFloat(row.quantity) > 0);
   const canSubmit =
-    (!has("to") || Boolean(form.to)) &&
-    (!has("from") || Boolean(form.from)) &&
-    (!(has("from") && has("to")) || form.from !== form.to) &&
+    (!has("to") || Boolean(form.to.trim())) &&
+    (!has("from") || Boolean(form.from.trim())) &&
+    (!(has("from") && has("to")) || form.from.trim().toLowerCase() !== form.to.trim().toLowerCase()) &&
     (!has("water") || Boolean(form.water)) &&
     (!has("productionOrderNo") || Boolean(form.productionOrderNo.trim())) &&
     (!has("items") || validRows.length > 0);
@@ -158,10 +214,13 @@ function NewOrderPanel({ type, onClose, onCreate, t }) {
     const details = {};
     if (has("water")) details.water = form.water;
     if (has("productionOrderNo")) details.productionOrderNo = form.productionOrderNo.trim();
+    // A typed place that matches a known one (any capitals) takes the known
+    // spelling, so "sh01" does not become a second place next to "SH01".
+    const canonical = (value) => locations.find((name) => name.toLowerCase() === value.trim().toLowerCase()) ?? value.trim();
     onCreate({
       type: config.code,
-      from: has("from") ? form.from : null,
-      to: has("to") ? form.to : null,
+      from: has("from") ? canonical(form.from) : null,
+      to: has("to") ? canonical(form.to) : null,
       details,
       note: form.note.trim(),
       employeeNo: session?.userId ?? "",
@@ -189,6 +248,14 @@ function NewOrderPanel({ type, onClose, onCreate, t }) {
     </label>
   );
 
+  // Lines only, or - for the free-text type - suggestions + any typed place.
+  const locationField = (field, label) =>
+    config.freeText ? (
+      <LocationInput label={label} value={form[field]} onChange={(value) => setField(field, value)} locations={locations} t={t} />
+    ) : (
+      lineSelect(field, label)
+    );
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
@@ -197,8 +264,13 @@ function NewOrderPanel({ type, onClose, onCreate, t }) {
         </DialogHeader>
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
-          {has("from") && lineSelect("from", t(`newOrderPanel.fields.${FROM_LABEL_KEY[config.code] ?? "from"}`))}
-          {has("to") && lineSelect("to", t("newOrderPanel.fields.to"))}
+          {/* TODO(frequent routes): a "Częste trasy" strip goes here, above the
+              form - the routes this user orders most, one tap fills skąd + dokąd.
+              Not built yet; the suggestions below are the same list for everyone
+              (not per user), so there is nothing personal to show. When it comes,
+              rank by this user's own past orders (requested_by), newest first. */}
+          {has("from") && locationField("from", t(`newOrderPanel.fields.${FROM_LABEL_KEY[config.code] ?? "from"}`))}
+          {has("to") && locationField("to", t("newOrderPanel.fields.to"))}
 
           {has("water") && (
             <div className="flex flex-col gap-1">
@@ -401,6 +473,17 @@ export default function OrdersCipListTable() {
     setOrdersData((prev) => [order, ...prev]);
   }
 
+  // Every place known so far: the fixed lines first, then whatever was typed
+    // on earlier transport orders (each new place joins the list by being on an
+    // order). Same list for everyone.
+  const locationPool = useMemo(() => {
+    const extra = new Set();
+    for (const order of ordersData) {
+      for (const place of [order.from, order.to]) if (place && !LINE_CODES.includes(place)) extra.add(place);
+    }
+    return [...LINE_CODES, ...[...extra].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))];
+  }, [ordersData]);
+
   const orders = useMemo(() => {
     if (!search) return ordersData;
     const needle = search.toLowerCase();
@@ -437,7 +520,7 @@ export default function OrdersCipListTable() {
         </DropdownMenu>
       </div>
 
-      <NewOrderPanel type={newOrderType} onClose={() => setNewOrderType(null)} onCreate={handleCreateOrder} t={t} />
+      <NewOrderPanel type={newOrderType} locations={locationPool} onClose={() => setNewOrderType(null)} onCreate={handleCreateOrder} t={t} />
 
       <div className="mt-4">
         <FrpFilters onGlobalFilterChange={setSearch} />

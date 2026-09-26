@@ -318,6 +318,8 @@
         "note": "Additional information"
       },
       "notePlaceholder": "Optional - e.g. extra information for the forklift operator",
+      "locationPlaceholder": "Pick from the list or type your own",
+      "locationHint": "A new place is saved with the order and suggested from then on.",
       "addItemLabel": "Add material",
       "addItemPlaceholder": "Search by number or name...",
       "noMatches": "No matches",

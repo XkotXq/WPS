@@ -220,7 +220,9 @@ Known gotchas worth knowing before editing:
 as a badge and a "Typ" column, and one "Nowe zamówienie" button that opens a
 menu of the order types; the chosen type opens a centered dialog with just that
 type's inputs (`ORDER_TYPES` in the component: line pickers from the fixed line
-codes, clean/dirty water, production order number, materials searched in
+codes (for "Transport półproduktów": suggestions from every place known so far, any
+typed text accepted and remembered - `LocationInput`), clean/dirty water, production
+order number, materials searched in
 `sm_catalog` with the unit read from it). No photo field until storage is decided. "Historia zamówień",
 "Wytyczne do zamówień" and "Raporty" are placeholders. The real data model
 (transport orders of six types, order numbers, shifts A/B/C, photos), the
