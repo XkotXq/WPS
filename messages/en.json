@@ -322,7 +322,7 @@
       "locationPlaceholder": "Pick or type",
       "photo": {
         "label": "Photo",
-        "add": "Add a photo from your computer (click or drag)",
+        "add": "Add a photo (click or drag)",
         "remove": "Remove photo",
         "notImage": "Choose an image file (e.g. JPG or PNG)."
       },

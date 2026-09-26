@@ -322,7 +322,7 @@
       "locationPlaceholder": "Wybierz lub wpisz",
       "photo": {
         "label": "Zdjęcie",
-        "add": "Dodaj zdjęcie z komputera (kliknij lub przeciągnij)",
+        "add": "Dodaj zdjęcie (kliknij lub przeciągnij)",
         "remove": "Usuń zdjęcie",
         "notImage": "Wybierz plik graficzny (np. JPG lub PNG)."
       },
