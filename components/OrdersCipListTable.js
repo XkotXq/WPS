@@ -414,8 +414,8 @@ export default function OrdersCipListTable() {
               </Button>
             }
           />
-          {/* Wide enough for every type name on one line. */}
-          <DropdownMenuContent align="end" className="min-w-64">
+          {/* Fixed 200px wide - room for the longest type name on one line. */}
+          <DropdownMenuContent align="end" className="w-[200px] min-w-[200px]">
             {ORDER_TYPES.map(({ code, icon: Icon, iconTone }) => (
               <DropdownMenuItem key={code} onClick={() => setNewOrderType(code)} className="gap-2.5 whitespace-nowrap py-1.5">
                 <Icon className={`h-4 w-4 ${iconTone}`} />
