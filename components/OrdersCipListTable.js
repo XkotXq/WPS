@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Cable, ChevronDown, ChevronRight, Droplets, Package, Plus, Trash2, Truck, Undo2, X } from "lucide-react";
+import { ArrowRight, Cable, ChevronDown, ChevronRight, Droplets, Package, Plus, Trash2, Truck, Undo2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -89,7 +89,7 @@ function detailLines(order, t) {
 // (same list for everyone - not personalised), filtered by what is typed, and any
 // other text is accepted as it is (a new place - it is saved with the order and
 // suggested from then on). Suggestions come from `locations` (see NewOrderPanel).
-function LocationInput({ label, value, onChange, locations, t }) {
+function LocationInput({ label, value, onChange, locations, t, showHint = true }) {
   const [open, setOpen] = useState(false);
   const needle = value.trim().toLowerCase();
   const matches = useMemo(
@@ -99,7 +99,7 @@ function LocationInput({ label, value, onChange, locations, t }) {
   const isNew = needle !== "" && !locations.some((name) => name.toLowerCase() === needle);
 
   return (
-    <label className="relative flex flex-col gap-1">
+    <label className="flex flex-col gap-1">
       <span className={LABEL_CLS}>
         {label}
         <RequiredMark />
@@ -116,7 +116,7 @@ function LocationInput({ label, value, onChange, locations, t }) {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && matches.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
           {matches.map((name) => (
             <button
               key={name}
@@ -133,7 +133,7 @@ function LocationInput({ label, value, onChange, locations, t }) {
           ))}
         </div>
       )}
-      {isNew && <span className="text-xs text-gray-400 dark:text-neutral-500">{t("newOrderPanel.locationHint")}</span>}
+      {isNew && showHint && <span className="text-xs text-gray-400 dark:text-neutral-500">{t("newOrderPanel.locationHint")}</span>}
     </label>
   );
 }
@@ -248,10 +248,13 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
     </label>
   );
 
+  // "Skąd" and "dokąd" together sit in one row - [skąd] -> [dokąd].
+  const inRow = has("from") && has("to");
+  const isNewPlace = (value) => value.trim() !== "" && !locations.some((name) => name.toLowerCase() === value.trim().toLowerCase());
   // Lines only, or - for the free-text type - suggestions + any typed place.
   const locationField = (field, label) =>
     config.freeText ? (
-      <LocationInput label={label} value={form[field]} onChange={(value) => setField(field, value)} locations={locations} t={t} />
+      <LocationInput label={label} value={form[field]} onChange={(value) => setField(field, value)} locations={locations} t={t} showHint={!inRow} />
     ) : (
       lineSelect(field, label)
     );
@@ -269,8 +272,26 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
               Not built yet; the suggestions below are the same list for everyone
               (not per user), so there is nothing personal to show. When it comes,
               rank by this user's own past orders (requested_by), newest first. */}
-          {has("from") && locationField("from", t(`newOrderPanel.fields.${FROM_LABEL_KEY[config.code] ?? "from"}`))}
-          {has("to") && locationField("to", t("newOrderPanel.fields.to"))}
+          {inRow ? (
+            <div>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
+                {locationField("from", t(`newOrderPanel.fields.${FROM_LABEL_KEY[config.code] ?? "from"}`))}
+                {/* mt-5 = the label row above the inputs, so the arrow sits level with them */}
+                <div className="mt-5 flex h-10 items-center text-gray-400 dark:text-neutral-500">
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+                {locationField("to", t("newOrderPanel.fields.toShort"))}
+              </div>
+              {config.freeText && (isNewPlace(form.from) || isNewPlace(form.to)) && (
+                <p className="mt-1 text-xs text-gray-400 dark:text-neutral-500">{t("newOrderPanel.locationHint")}</p>
+              )}
+            </div>
+          ) : (
+            <>
+              {has("from") && locationField("from", t(`newOrderPanel.fields.${FROM_LABEL_KEY[config.code] ?? "from"}`))}
+              {has("to") && locationField("to", t("newOrderPanel.fields.to"))}
+            </>
+          )}
 
           {has("water") && (
             <div className="flex flex-col gap-1">
@@ -308,7 +329,7 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
           )}
 
           {has("items") && (
-            <label className="relative flex flex-col gap-1">
+            <label className="flex flex-col gap-1">
               <span className={LABEL_CLS}>
                 {t("newOrderPanel.addItemLabel")}
                 <RequiredMark />
@@ -325,7 +346,7 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
                 placeholder={t("newOrderPanel.addItemPlaceholder")}
               />
               {pickerOpen && itemSearch.trim() && (
-                <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
                   {matches.length === 0 ? (
                     <p className="px-3 py-2 text-sm text-gray-400 dark:text-neutral-500">{t("newOrderPanel.noMatches")}</p>
                   ) : (

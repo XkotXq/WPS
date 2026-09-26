@@ -312,13 +312,14 @@
       "linePlaceholder": "Select a line",
       "fields": {
         "to": "Deliver to",
+        "toShort": "To",
         "from": "From",
         "place": "Place",
         "collectFrom": "Collect from",
         "note": "Additional information"
       },
       "notePlaceholder": "Optional - e.g. extra information for the forklift operator",
-      "locationPlaceholder": "Pick from the list or type your own",
+      "locationPlaceholder": "Pick or type",
       "locationHint": "A new place is saved with the order and suggested from then on.",
       "addItemLabel": "Add material",
       "addItemPlaceholder": "Search by number or name...",
