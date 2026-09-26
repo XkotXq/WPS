@@ -299,7 +299,7 @@
       "employeeNo": "Ordered by",
       "fulfilledBy": "Fulfilled by",
       "createdAt": "Created at",
-      "note": "Note"
+      "note": "Additional information"
     },
     "status": {
       "new": "New",
@@ -315,7 +315,7 @@
         "from": "From",
         "place": "Place",
         "collectFrom": "Collect from",
-        "note": "Remarks"
+        "note": "Additional information"
       },
       "notePlaceholder": "Optional - e.g. extra information for the forklift operator",
       "addItemLabel": "Add material",
