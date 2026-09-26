@@ -299,7 +299,7 @@
       "employeeNo": "Zamawiający",
       "fulfilledBy": "Zrealizował",
       "createdAt": "Data utworzenia",
-      "note": "Notatka"
+      "note": "Uwagi"
     },
     "status": {
       "new": "Nowe",
@@ -314,8 +314,10 @@
         "to": "Dokąd dostarczyć",
         "from": "Skąd",
         "place": "Miejsce",
-        "collectFrom": "Skąd odebrać"
+        "collectFrom": "Skąd odebrać",
+        "note": "Uwagi"
       },
+      "notePlaceholder": "Opcjonalnie - np. dodatkowe informacje dla wózkowego",
       "addItemLabel": "Dodaj materiał",
       "addItemPlaceholder": "Szukaj po numerze lub nazwie...",
       "noMatches": "Brak wyników",

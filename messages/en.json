@@ -314,8 +314,10 @@
         "to": "Deliver to",
         "from": "From",
         "place": "Place",
-        "collectFrom": "Collect from"
+        "collectFrom": "Collect from",
+        "note": "Remarks"
       },
+      "notePlaceholder": "Optional - e.g. extra information for the forklift operator",
       "addItemLabel": "Add material",
       "addItemPlaceholder": "Search by number or name...",
       "noMatches": "No matches",

@@ -82,7 +82,7 @@ function detailLines(order, t) {
   return lines;
 }
 
-const EMPTY_FORM = { from: "", to: "", water: "", productionOrderNo: "" };
+const EMPTY_FORM = { from: "", to: "", water: "", productionOrderNo: "", note: "" };
 
 // "Nowe zamówienie": the form of one order type (see ORDER_TYPES). Materials
 // are added one at a time by searching the same reference catalog Materiały SM
@@ -163,6 +163,7 @@ function NewOrderPanel({ type, onClose, onCreate, t }) {
       from: has("from") ? form.from : null,
       to: has("to") ? form.to : null,
       details,
+      note: form.note.trim(),
       employeeNo: session?.userId ?? "",
       items: has("items")
         ? validRows.map((row) => ({ itemNo: row.itemNo, itemName: row.itemName, quantity: row.quantity, unit: row.unit, note: "-" }))
@@ -306,6 +307,16 @@ function NewOrderPanel({ type, onClose, onCreate, t }) {
               ))}
             </div>
           )}
+
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLS}>{t("newOrderPanel.fields.note")}</span>
+            <textarea
+              className={`${FIELD_CLS} h-20 resize-none py-2`}
+              placeholder={t("newOrderPanel.notePlaceholder")}
+              value={form.note}
+              onChange={(e) => setField("note", e.target.value)}
+            />
+          </label>
         </div>
 
         <DialogFooter>
@@ -370,7 +381,7 @@ export default function OrdersCipListTable() {
   // New order goes straight to "new"/onto the top of the list - same
   // local-only concept as the rest of this table (see its own comment),
   // no backend call.
-  function handleCreateOrder({ type, from, to, details, employeeNo, items }) {
+  function handleCreateOrder({ type, from, to, details, note, employeeNo, items }) {
     const orderNo = nextOrderNo(ordersData);
     const order = {
       id: orderNo,
@@ -384,7 +395,7 @@ export default function OrdersCipListTable() {
       employeeNo,
       fulfilledBy: "-",
       createdAt: new Date().toISOString(),
-      note: "-",
+      note: note || "-",
       items,
     };
     setOrdersData((prev) => [order, ...prev]);
