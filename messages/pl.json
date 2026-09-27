@@ -293,7 +293,7 @@
     },
     "viewMode": { "table": "Tabela", "cards": "Karty" },
     "columns": {
-      "orderNo": "Numer zamówienia",
+      "orderNo": "Numer transportu",
       "type": "Typ",
       "status": "Status",
       "line": "Linia",

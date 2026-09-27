@@ -293,7 +293,7 @@
     },
     "viewMode": { "table": "Table", "cards": "Cards" },
     "columns": {
-      "orderNo": "Order number",
+      "orderNo": "Transport number",
       "type": "Type",
       "status": "Status",
       "line": "Line",
