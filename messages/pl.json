@@ -291,6 +291,7 @@
       "dirty": "Brudna",
       "productionOrderNo": "Nr zamówienia produkcyjnego"
     },
+    "viewMode": { "table": "Tabela", "cards": "Karty" },
     "columns": {
       "orderNo": "Numer zamówienia",
       "type": "Typ",

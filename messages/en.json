@@ -291,6 +291,7 @@
       "dirty": "Dirty",
       "productionOrderNo": "Production order no."
     },
+    "viewMode": { "table": "Table", "cards": "Cards" },
     "columns": {
       "orderNo": "Order number",
       "type": "Type",

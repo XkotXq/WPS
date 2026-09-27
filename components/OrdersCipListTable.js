@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ChevronDown, ChevronRight, Droplets, ImagePlus, Package, Plus, Spool, Trash2, Truck, Undo2, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Droplets, ImagePlus, LayoutGrid, Package, Plus, Spool, Table2, Trash2, Truck, Undo2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -529,6 +529,82 @@ function formatDateTime(value) {
 const HEAD_CLS = "sticky top-0 z-10 bg-gray-50 text-[11px] font-medium tracking-wide text-gray-400 dark:bg-neutral-800 dark:text-neutral-500";
 const CELL_CLS = "text-gray-600 dark:text-neutral-300";
 
+// "Karty" view: everything type-specific (detailLines, items, photo) sits
+// right on the card instead of behind a chevron - the point of this view is
+// seeing e.g. "Dolewanie wody" + "Rodzaj wody: Czysta" at a glance, not
+// having to open each order to find out.
+function OrderCard({ order, t }) {
+  const config = ORDER_TYPES.find((entry) => entry.code === order.type);
+  const Icon = config?.icon;
+  const details = detailLines(order, t);
+  const items = order.items ?? [];
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {Icon && <Icon className={`h-4 w-4 shrink-0 ${config.iconTone}`} />}
+          <span className="truncate text-sm font-semibold text-gray-900 dark:text-neutral-100">{t(`types.${order.type}`)}</span>
+        </div>
+        <StatusBadge status={order.status} />
+      </div>
+
+      <div>
+        <p className="font-medium text-gray-900 dark:text-neutral-100">{order.orderNo}</p>
+        <p className="text-sm text-gray-500 dark:text-neutral-400">{routeLabel(order)}</p>
+      </div>
+
+      {details.length > 0 && (
+        <ul className="space-y-0.5 text-sm text-gray-700 dark:text-neutral-200">
+          {details.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
+
+      {items.length > 0 && (
+        <ul className="space-y-1 border-t border-gray-100 dark:border-neutral-800 pt-2 text-sm text-gray-700 dark:text-neutral-200">
+          {items.map((item) => (
+            <li key={item.itemNo} className="flex items-center justify-between gap-2">
+              <span className="truncate">
+                {item.itemName} <span className="text-gray-400 dark:text-neutral-500">{item.itemNo}</span>
+              </span>
+              <span className="shrink-0 tabular-nums">
+                {item.quantity}
+                {item.unit ? ` ${item.unit}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {order.photo && (
+        <a href={order.photo.url} target="_blank" rel="noreferrer" title={order.photo.name}>
+          <img
+            src={order.photo.url}
+            alt={order.photo.name}
+            className="h-28 w-full rounded-md border border-gray-200 object-cover dark:border-neutral-700"
+          />
+        </a>
+      )}
+
+      {order.note && order.note !== "-" && <p className="text-sm text-gray-500 dark:text-neutral-400">{order.note}</p>}
+
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-gray-100 dark:border-neutral-800 pt-2 text-xs text-gray-400 dark:text-neutral-500">
+        <span>
+          {t("columns.employeeNo")}: {order.employeeNo || "-"}
+        </span>
+        {order.fulfilledBy && order.fulfilledBy !== "-" && (
+          <span>
+            {t("columns.fulfilledBy")}: {order.fulfilledBy}
+          </span>
+        )}
+        <span>{formatDateTime(order.createdAt)}</span>
+      </div>
+    </div>
+  );
+}
+
 // Local-only concept table, same status as Materiały SM (see AGENTS.md's
 // "Materiały SM" section) - "Zamówienia" has no backend endpoint yet, so
 // this renders straight from a static seed (lib/ordersCipSeed.js) instead
@@ -545,6 +621,7 @@ export default function OrdersCipListTable() {
   const [expanded, setExpanded] = useState({});
   const [ordersData, setOrdersData] = useState(ORDERS_CIP_SEED);
   const [newOrderType, setNewOrderType] = useState(null);
+  const [viewMode, setViewMode] = useState("table");
 
   function toggle(orderNo) {
     setExpanded((prev) => ({ ...prev, [orderNo]: !prev[orderNo] }));
@@ -599,6 +676,35 @@ export default function OrdersCipListTable() {
     <div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-gray-500 dark:text-neutral-400">{t("count", { count: orders.length })}</p>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              title={t("viewMode.table")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                viewMode === "table"
+                  ? "bg-white text-navy-950 shadow-sm dark:bg-neutral-900 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+              }`}
+            >
+              <Table2 className="h-4 w-4" />
+              {t("viewMode.table")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              title={t("viewMode.cards")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                viewMode === "cards"
+                  ? "bg-white text-navy-950 shadow-sm dark:bg-neutral-900 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              {t("viewMode.cards")}
+            </button>
+          </div>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -619,6 +725,7 @@ export default function OrdersCipListTable() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
 
       <NewOrderPanel type={newOrderType} locations={locationPool} onClose={() => setNewOrderType(null)} onCreate={handleCreateOrder} t={t} />
@@ -626,6 +733,19 @@ export default function OrdersCipListTable() {
       <div className="mt-4">
         <FrpFilters onGlobalFilterChange={setSearch} />
 
+        {viewMode === "cards" ? (
+          orders.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-gray-200 dark:border-neutral-800 py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
+              {t("emptyStatus")}
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {orders.map((order) => (
+                <OrderCard key={order.orderNo} order={order} t={t} />
+              ))}
+            </div>
+          )
+        ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-neutral-800">
           <Table>
             <TableHeader>
@@ -729,6 +849,7 @@ export default function OrdersCipListTable() {
             </TableBody>
           </Table>
         </div>
+        )}
       </div>
     </div>
   );
