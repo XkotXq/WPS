@@ -22,7 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { restrictToHorizontalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 import { PAGE_REGISTRY } from "@/lib/dashboard-pages";
 
-function SortableTab({ href, active, onClose, showClose, suppressClickRef }) {
+function SortableTab({ href, active, onClose, showClose, suppressClickUntilRef }) {
   const tNav = useTranslations("nav");
   const page = PAGE_REGISTRY.find((item) => item.href === href);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -62,13 +62,17 @@ function SortableTab({ href, active, onClose, showClose, suppressClickRef }) {
         href={href}
         className="flex items-center gap-2"
         onClick={(event) => {
-          // dnd-kit still lets a native click through on the element that
-          // was under the pointer at drag-end - without this, dragging a
-          // tab to reorder it also navigates to whichever tab you dropped
-          // on (usually the one you just dragged).
-          if (suppressClickRef.current) {
+          // dnd-kit still lets a native click through on whichever tab ends
+          // up under the pointer at drag-end - reordering moves DOM nodes
+          // (React's keyed reconciliation) before the browser dispatches
+          // that click, so the click's hit-test can land on a *different*
+          // tab than the one actually dragged. A time window (not "the
+          // first click after drag start") survives that regardless of
+          // exactly when the click fires relative to the state-driven
+          // reorder - a real next click, a deliberate tap, is never this
+          // soon after a drop.
+          if (Date.now() < suppressClickUntilRef.current) {
             event.preventDefault();
-            suppressClickRef.current = false;
           }
         }}
       >
@@ -98,16 +102,20 @@ export default function RecentTabsBar({ paths, setPaths, activePath, onCloseTab 
     useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
-  // Set as soon as a drag activates (past the sensors' delay/tolerance, so
-  // real clicks never touch it) and cleared by the first click afterward -
-  // see the comment in SortableTab's Link.
-  const suppressClickRef = useRef(false);
+  // A click before this timestamp is a drag's own spurious click, not a
+  // real one - see the comment in SortableTab's Link. Infinity while a drag
+  // is actually in progress (activated past the sensors' delay/tolerance, so
+  // a real unmoved click never touches this at all); set to a short window
+  // past "now" on drop, generous enough to outlast React's reorder commit
+  // and whatever click the browser fires after it.
+  const suppressClickUntilRef = useRef(0);
 
   function handleDragStart() {
-    suppressClickRef.current = true;
+    suppressClickUntilRef.current = Infinity;
   }
 
   function handleDragEnd(event) {
+    suppressClickUntilRef.current = Date.now() + 300;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setPaths((prev) => {
@@ -140,7 +148,7 @@ export default function RecentTabsBar({ paths, setPaths, activePath, onCloseTab 
               active={activePath === href}
               onClose={onCloseTab}
               showClose={paths.length > 1}
-              suppressClickRef={suppressClickRef}
+              suppressClickUntilRef={suppressClickUntilRef}
             />
           ))}
         </div>
