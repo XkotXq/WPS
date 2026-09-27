@@ -63,13 +63,76 @@ function RequiredMark() {
 
 // Next sequential order number for the current year - ZM/<year>/<4-digit
 // running number> matching the seed's own format (see ordersCipSeed.js).
-function nextOrderNo(existingOrders) {
-  const year = new Date().getFullYear();
-  const highest = existingOrders.reduce((max, o) => {
-    const match = o.orderNo.match(/(\d+)$/);
-    return match ? Math.max(max, parseInt(match[1], 10)) : max;
-  }, 0);
-  return `ZM/${year}/${String(highest + 1).padStart(4, "0")}`;
+// Three 8-hour shifts covering the whole day, each defined by its start -
+// mirrors wpsApi's orders.draft.sql (shifts table + order_shift()) exactly,
+// so a real backend can take over order numbering later without the format
+// changing under this demo's feet.
+const SHIFTS = [
+  { code: "A", startHour: 6 },
+  { code: "B", startHour: 14 },
+  { code: "C", startHour: 22 },
+];
+
+// now's wall-clock date/time in Europe/Warsaw, regardless of the browser's
+// own timezone - Intl handles DST so this never needs a manual UTC offset.
+function warsawParts(now) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Warsaw",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value])
+  );
+  return { year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour === 24 ? 0 : +parts.hour, minute: +parts.minute };
+}
+
+// Which shift `now` falls in: its code, the calendar day it STARTED on (for
+// shift C after midnight that's the day before), the hour of the shift
+// (1-8, by the wall clock) and the plain minute. Same "most recent shift
+// start not in the future" rule as order_shift() in orders.draft.sql - built
+// on a UTC-flagged Date used purely for calendar-day math (year/month/day
+// rollover), never for its own timezone, so it can't drift by an hour.
+function orderShift(now) {
+  const { year, month, day, hour, minute } = warsawParts(now);
+  const nowMinutes = hour * 60 + minute;
+  let best = null;
+  for (const shift of SHIFTS) {
+    let deltaMinutes = nowMinutes - shift.startHour * 60;
+    const shiftDate = new Date(Date.UTC(year, month - 1, day));
+    if (deltaMinutes < 0) {
+      deltaMinutes += 24 * 60;
+      shiftDate.setUTCDate(shiftDate.getUTCDate() - 1);
+    }
+    if (!best || deltaMinutes < best.deltaMinutes) best = { code: shift.code, deltaMinutes, shiftDate };
+  }
+  return { code: best.code, hourOfShift: Math.floor(best.deltaMinutes / 60) + 1, minute, shiftDate: best.shiftDate };
+}
+
+function yymmdd(date) {
+  return `${String(date.getUTCFullYear()).slice(-2)}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+// [shift A/B/C][hour of the shift 1-8][minute 00-59]/[yymmdd of the shift's
+// START day]/[3 random digits], e.g. B137/260924/482 - the random suffix is
+// re-drawn until it isn't already used (this demo's own stand-in for the
+// real backend's advisory-lock-serialized retry loop).
+function nextOrderNo(existingOrders, now = new Date()) {
+  const { code, hourOfShift, minute, shiftDate } = orderShift(now);
+  const base = `${code}${hourOfShift}${String(minute).padStart(2, "0")}/${yymmdd(shiftDate)}`;
+  const taken = new Set(existingOrders.map((o) => o.orderNo));
+  let candidate;
+  let tries = 0;
+  do {
+    candidate = `${base}/${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`;
+    tries += 1;
+  } while (taken.has(candidate) && tries < 100);
+  return candidate;
 }
 
 // "Skąd → dokąd" when an order has both, else the one line it concerns.
@@ -615,8 +678,15 @@ function OrderCard({ order, t }) {
 // own hand-rolled groupParent/groupChild expand pattern: a chevron toggles
 // each order row open to reveal what it holds (its type-specific values and
 // its ordered items) indented underneath, same tree-line treatment.
-export default function OrdersCipListTable() {
+// Lista zamówień = still open (new/in_progress) - the working queue;
+// Historia zamówień = closed (done/cancelled) - the archive. A closed order
+// leaves the queue the moment it's marked done/cancelled, no grace period -
+// see AGENTS.md's "Zamówienia" section for the reasoning.
+const STATUS_SETS = { active: ["new", "inProgress"], history: ["done", "cancelled"] };
+
+export default function OrdersCipListTable({ mode = "active" }) {
   const t = useTranslations("ordersCip");
+  const statusSet = STATUS_SETS[mode];
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState({});
   const [ordersData, setOrdersData] = useState(ORDERS_CIP_SEED);
@@ -631,7 +701,8 @@ export default function OrdersCipListTable() {
   // local-only concept as the rest of this table (see its own comment),
   // no backend call.
   function handleCreateOrder({ type, from, to, details, note, photo, employeeNo, items }) {
-    const orderNo = nextOrderNo(ordersData);
+    const now = new Date();
+    const orderNo = nextOrderNo(ordersData, now);
     const order = {
       id: orderNo,
       orderNo,
@@ -643,7 +714,7 @@ export default function OrdersCipListTable() {
       details,
       employeeNo,
       fulfilledBy: "-",
-      createdAt: new Date().toISOString(),
+      createdAt: now.toISOString(),
       note: note || "-",
       photo,
       items,
@@ -663,14 +734,15 @@ export default function OrdersCipListTable() {
   }, [ordersData]);
 
   const orders = useMemo(() => {
-    if (!search) return ordersData;
+    const inMode = ordersData.filter((order) => statusSet.includes(order.status));
+    if (!search) return inMode;
     const needle = search.toLowerCase();
-    return ordersData.filter((order) =>
+    return inMode.filter((order) =>
       [order.orderNo, t(`types.${order.type}`), routeLabel(order), order.employeeNo, order.note, t(`status.${order.status}`)].some((field) =>
         field?.toLowerCase().includes(needle)
       )
     );
-  }, [ordersData, search, t]);
+  }, [ordersData, search, statusSet, t]);
 
   return (
     <div>
@@ -705,30 +777,35 @@ export default function OrdersCipListTable() {
               {t("viewMode.cards")}
             </button>
           </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button size="sm" className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                {t("newOrder")}
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            }
-          />
-          {/* Fixed 200px wide - room for the longest type name on one line. */}
-          <DropdownMenuContent align="end" className="w-[200px] min-w-[200px]">
-            {ORDER_TYPES.map(({ code, icon: Icon, iconTone }) => (
-              <DropdownMenuItem key={code} onClick={() => setNewOrderType(code)} className="gap-2.5 whitespace-nowrap py-1.5">
-                <Icon className={`h-4 w-4 ${iconTone}`} />
-                {t(`types.${code}`)}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {mode === "active" && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button size="sm" className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  {t("newOrder")}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              }
+            />
+            {/* Fixed 200px wide - room for the longest type name on one line. */}
+            <DropdownMenuContent align="end" className="w-[200px] min-w-[200px]">
+              {ORDER_TYPES.map(({ code, icon: Icon, iconTone }) => (
+                <DropdownMenuItem key={code} onClick={() => setNewOrderType(code)} className="gap-2.5 whitespace-nowrap py-1.5">
+                  <Icon className={`h-4 w-4 ${iconTone}`} />
+                  {t(`types.${code}`)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         </div>
       </div>
 
-      <NewOrderPanel type={newOrderType} locations={locationPool} onClose={() => setNewOrderType(null)} onCreate={handleCreateOrder} t={t} />
+      {/* Creating a new order only makes sense from the active queue, not the archive. */}
+      {mode === "active" && (
+        <NewOrderPanel type={newOrderType} locations={locationPool} onClose={() => setNewOrderType(null)} onCreate={handleCreateOrder} t={t} />
+      )}
 
       <div className="mt-4">
         <FrpFilters onGlobalFilterChange={setSearch} />

@@ -340,8 +340,7 @@
     "subtitle": "Guidelines for placing orders will appear here. This section is coming soon."
   },
   "ordersCipHistory": {
-    "title": "Order history",
-    "subtitle": "Completed order history will be shown here. This section is coming soon."
+    "title": "Order history"
   },
   "ordersCipReports": {
     "title": "Reports",
