@@ -319,6 +319,7 @@
       },
       "notePlaceholder": "Optional - e.g. extra information for the forklift operator",
       "locationPlaceholder": "Pick or type",
+      "locationInvalid": "Pick a line from the suggestions.",
       "photo": {
         "label": "Photo",
         "add": "Add a photo (click or drag)",

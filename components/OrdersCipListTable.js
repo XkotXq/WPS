@@ -91,13 +91,18 @@ function detailLines(order, t) {
 // other text is accepted as it is (a new place - it is saved with the order and
 // suggested from then on, no caption about it). The list floats over the form and
 // only shows once something is typed. Suggestions come from `locations`.
-function LocationInput({ label, value, onChange, locations, t }) {
+// `restrictToList`: the value must be exactly one of `locations` (case-
+// insensitive) - no addition of your own, unlike Transport półproduktów's
+// "skąd"/"dokąd", which is allowed to register a genuinely new place.
+function LocationInput({ label, value, onChange, locations, t, restrictToList = false }) {
   const [open, setOpen] = useState(false);
   const needle = value.trim().toLowerCase();
   const matches = useMemo(
     () => locations.filter((name) => !needle || name.toLowerCase().includes(needle)).slice(0, 8),
     [locations, needle]
   );
+  const isKnown = locations.some((name) => name.toLowerCase() === needle);
+  const showInvalidHint = restrictToList && needle !== "" && !isKnown;
 
   return (
     <label className="relative flex flex-col gap-1">
@@ -134,6 +139,7 @@ function LocationInput({ label, value, onChange, locations, t }) {
           ))}
         </div>
       )}
+      {showInvalidHint && <span className="text-xs text-red-600 dark:text-red-400">{t("newOrderPanel.locationInvalid")}</span>}
     </label>
   );
 }
@@ -236,9 +242,18 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
   }
 
   const validRows = rows.filter((row) => parseFloat(row.quantity) > 0);
+  // A line-only field (every type but the free-text transport) must be
+  // exactly one of the fixed line codes - no made-up addition, unlike
+  // "skąd"/"dokąd" on Transport półproduktów, which is allowed to register
+  // a genuinely new place.
+  const isValidPlace = (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    return config.freeText || LINE_CODES.some((code) => code.toLowerCase() === trimmed.toLowerCase());
+  };
   const canSubmit =
-    (!has("to") || Boolean(form.to.trim())) &&
-    (!has("from") || Boolean(form.from.trim())) &&
+    (!has("to") || isValidPlace(form.to)) &&
+    (!has("from") || isValidPlace(form.from)) &&
     (!(has("from") && has("to")) || form.from.trim().toLowerCase() !== form.to.trim().toLowerCase()) &&
     (!has("water") || Boolean(form.water)) &&
     (!has("productionOrderNo") || Boolean(form.productionOrderNo.trim())) &&
@@ -281,6 +296,7 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
       value={form[field]}
       onChange={(value) => setField(field, value)}
       locations={config.freeText ? locations : LINE_CODES}
+      restrictToList={!config.freeText}
       t={t}
     />
   );

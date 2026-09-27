@@ -319,6 +319,7 @@
       },
       "notePlaceholder": "Opcjonalnie - np. dodatkowe informacje dla wózkowego",
       "locationPlaceholder": "Wybierz lub wpisz",
+      "locationInvalid": "Wybierz linię z listy podpowiedzi.",
       "photo": {
         "label": "Zdjęcie",
         "add": "Dodaj zdjęcie (kliknij lub przeciągnij)",
