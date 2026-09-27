@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Cable, ChevronDown, ChevronRight, Droplets, ImagePlus, Package, Plus, Trash2, Truck, Undo2, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Droplets, ImagePlus, Package, Plus, Spool, Trash2, Truck, Undo2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,7 +41,7 @@ const LINE_CODES = [
 const ORDER_TYPES = [
   { code: "water_refill", fields: ["to", "water"], icon: Droplets, iconTone: "text-blue-600! dark:text-blue-400!" },
   { code: "material_order", fields: ["to", "productionOrderNo", "items"], icon: Package, iconTone: "text-pink-600! dark:text-pink-400!" },
-  { code: "spool_order", fields: ["to", "items"], icon: Cable, iconTone: "text-gray-600! dark:text-neutral-300!" },
+  { code: "spool_order", fields: ["to", "items"], icon: Spool, iconTone: "text-gray-600! dark:text-neutral-300!" },
   { code: "goods_transport", fields: ["from", "to", "photo"], freeText: true, icon: Truck, iconTone: "text-orange-600! dark:text-orange-400!" },
   { code: "waste_removal", fields: ["from", "photo"], icon: Trash2, iconTone: "text-yellow-600! dark:text-yellow-400!" },
   { code: "warehouse_return", fields: ["from", "photo"], icon: Undo2, iconTone: "text-green-600! dark:text-green-400!" },
