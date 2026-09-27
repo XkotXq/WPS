@@ -309,7 +309,6 @@
     },
     "newOrderPanel": {
       "titleFor": "Nowe zamówienie: {type}",
-      "linePlaceholder": "Wybierz linię",
       "fields": {
         "to": "Dokąd dostarczyć",
         "toShort": "Dokąd",

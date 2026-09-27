@@ -309,7 +309,6 @@
     },
     "newOrderPanel": {
       "titleFor": "New order: {type}",
-      "linePlaceholder": "Select a line",
       "fields": {
         "to": "Deliver to",
         "toShort": "To",

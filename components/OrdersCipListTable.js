@@ -269,32 +269,21 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
     onClose();
   }
 
-  const lineSelect = (field, label) => (
-    <label className="flex flex-col gap-1">
-      <span className={LABEL_CLS}>
-        {label}
-        <RequiredMark />
-      </span>
-      <select className={FIELD_CLS} value={form[field]} onChange={(e) => setField(field, e.target.value)}>
-        <option value="">{t("newOrderPanel.linePlaceholder")}</option>
-        {LINE_CODES.map((code) => (
-          <option key={code} value={code}>
-            {code}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-
   // "Skąd" and "dokąd" together sit in one row - [skąd] -> [dokąd].
   const inRow = has("from") && has("to");
-  // Lines only, or - for the free-text type - suggestions + any typed place.
-  const locationField = (field, label) =>
-    config.freeText ? (
-      <LocationInput label={label} value={form[field]} onChange={(value) => setField(field, value)} locations={locations} t={t} />
-    ) : (
-      lineSelect(field, label)
-    );
+  // Same input-with-suggestions everywhere a place is picked - only the
+  // suggestion pool differs: the fixed line codes for an ordinary type, the
+  // full (fixed lines + every place typed on an earlier transport order)
+  // pool for the free-text type.
+  const locationField = (field, label) => (
+    <LocationInput
+      label={label}
+      value={form[field]}
+      onChange={(value) => setField(field, value)}
+      locations={config.freeText ? locations : LINE_CODES}
+      t={t}
+    />
+  );
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
