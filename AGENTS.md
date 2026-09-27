@@ -161,10 +161,28 @@ page layers that missing per-unit detail on top, backed by wpsapi's
   changed against `/api/sm-items`, sending each item's full row + its
   whole `units` array (the server replaces that item's units wholesale
   on every upsert - see `upsertSmItem` in `wpsapi/src/smItems.js`).
-  The two-write idea this screen is still built around for CIP itself:
-  item/quantity/location live in CIP; the unit (spool) number has
-  nowhere to go there, so it's kept here instead - this page does not
-  write to CIP.
+- **CIP sync**: a receipt or issue now *does* write to CIP - our stock
+  stays the source of truth, but wpsapi checks the change against CIP
+  first and refuses the whole save if CIP does (see wpsapi's AGENTS.md,
+  "CIP sync"). `setItems` takes an optional second argument, `cipTasks`
+  (`{ [itemNo]: { operation: "receipt" | "issue", quantity } }` - this
+  batch's own delta per item, built by each call site's own
+  `cipTasksByItemNo` helper from the same entries `logOperation` gets);
+  an item listed there is `await`ed through the Server Action
+  `lib/smItemsCipApi.js`'s `upsertSmItemViaCip` *before* being applied
+  locally, and reverts to its previous state (not silently dropped) if
+  CIP refuses - see `handleCreate`/`handleCreateAggregate`/
+  `handleReceiveOrder`/`handleIssue`/`handleIssueUnits`/`handleBulkIssue`.
+  Everything else routed through `setItems` (no `cipTasks` entry for that
+  item - `handleSave`'s edits, `handleAssignUnits`'s labeling,
+  `handleDeleteItem`) keeps the exact old fire-and-forget, errors-
+  swallowed behavior, unchanged.
+  The Server Action exists only because the CIP bearer token lives in an
+  httpOnly cookie (`lib/cipSession.js`) and must never reach this
+  "use client" file directly - `upsertSmItemViaCip` runs server-side,
+  attaches the token there, and is the one path that sends it.
+  `cipOperation`/`edit` (a location/note change with no quantity change)
+  is not wired into anything here yet.
 - **Catalog name enforcement**: everywhere an operator types both an
   item number and an item name (single receipt, bulk order-receipt
   paste), the typed name is checked against `sm_catalog` and silently
