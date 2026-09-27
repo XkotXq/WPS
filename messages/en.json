@@ -289,7 +289,7 @@
       "water": "Water type",
       "clean": "Clean",
       "dirty": "Dirty",
-      "productionOrderNo": "Production order no."
+      "productionOrderNo": "Order number"
     },
     "viewMode": { "table": "Table", "cards": "Cards" },
     "columns": {

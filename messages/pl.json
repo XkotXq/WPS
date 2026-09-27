@@ -289,7 +289,7 @@
       "water": "Rodzaj wody",
       "clean": "Czysta",
       "dirty": "Brudna",
-      "productionOrderNo": "Nr zamówienia produkcyjnego"
+      "productionOrderNo": "Numer zamówienia"
     },
     "viewMode": { "table": "Tabela", "cards": "Karty" },
     "columns": {
