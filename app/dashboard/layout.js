@@ -158,7 +158,11 @@ export default function DashboardLayout({ children }) {
             )}
           </div>
 
-          <nav className="mt-2 flex-1 space-y-1">
+          {/* min-h-0 overrides the flex item's default min-height:auto, which
+              otherwise ignores flex-1 for scrolling purposes and just grows
+              the whole <aside> past the viewport - pushing Zwiń nawigację/
+              Wyloguj off-screen with nothing to scroll them back into view. */}
+          <nav className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto">
             <Link
               href="/dashboard"
               title={collapsed ? tNav("home") : undefined}
