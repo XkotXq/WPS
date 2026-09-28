@@ -11,6 +11,7 @@ import {
   Package,
   ClipboardList,
   ShoppingCart,
+  Truck,
   PackageMinus,
   Boxes,
   Search,
@@ -29,7 +30,8 @@ const RECENT_PAGES_KEY = "wms-recent-pages";
 const STOCK_BASE_PATH = "/dashboard/stock";
 const MATERIALS_BASE_PATH = "/dashboard/materials-list-cip";
 const MATERIALS_SM_BASE_PATH = "/dashboard/materials-list-sm";
-const ORDERS_CIP_BASE_PATH = "/dashboard/orders/cip";
+const ORDERS_TRANSPORT_BASE_PATH = "/dashboard/orders/transport";
+const ORDERS_MATERIALS_BASE_PATH = "/dashboard/orders/materials";
 const ORDERS_WMS_BASE_PATH = "/dashboard/orders/wms";
 const MAX_RECENT_PAGES = 5;
 export default function DashboardLayout({ children }) {
@@ -45,7 +47,12 @@ export default function DashboardLayout({ children }) {
   const [materialsSmOpen, setMaterialsSmOpen] = useState(() =>
     pathname.startsWith(MATERIALS_SM_BASE_PATH)
   );
-  const [ordersCipOpen, setOrdersCipOpen] = useState(() => pathname.startsWith(ORDERS_CIP_BASE_PATH));
+  const [ordersTransportOpen, setOrdersTransportOpen] = useState(() =>
+    pathname.startsWith(ORDERS_TRANSPORT_BASE_PATH)
+  );
+  const [ordersMaterialsOpen, setOrdersMaterialsOpen] = useState(() =>
+    pathname.startsWith(ORDERS_MATERIALS_BASE_PATH)
+  );
   const [ordersWmsOpen, setOrdersWmsOpen] = useState(() => pathname.startsWith(ORDERS_WMS_BASE_PATH));
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
@@ -111,11 +118,15 @@ export default function DashboardLayout({ children }) {
     { href: "/dashboard/materials-list-sm/catalog-sm", label: tNav("materialsCatalogSm") },
   ];
 
-  const ordersCipChildren = [
-    { href: "/dashboard/orders/cip", label: tNav("ordersCipList") },
-    { href: "/dashboard/orders/cip/guidelines", label: tNav("ordersCipGuidelines") },
-    { href: "/dashboard/orders/cip/history", label: tNav("ordersCipHistory") },
-    { href: "/dashboard/orders/cip/reports", label: tNav("reports") },
+  const ordersTransportChildren = [
+    { href: "/dashboard/orders/transport", label: tNav("ordersTransportList") },
+    { href: "/dashboard/orders/transport/guidelines", label: tNav("ordersTransportGuidelines") },
+    { href: "/dashboard/orders/transport/history", label: tNav("ordersTransportHistory") },
+    { href: "/dashboard/orders/transport/reports", label: tNav("reports") },
+  ];
+
+  const ordersMaterialsChildren = [
+    { href: "/dashboard/orders/materials", label: tNav("ordersMaterialsSearch") },
   ];
 
   const ordersWmsChildren = [{ href: "/dashboard/orders/wms", label: tNav("ordersWmsLists") }];
@@ -206,14 +217,25 @@ export default function DashboardLayout({ children }) {
             />
 
             <NavGroup
-              icon={ShoppingCart}
-              label={tNav("ordersCip")}
-              basePath={ORDERS_CIP_BASE_PATH}
+              icon={Truck}
+              label={tNav("ordersTransport")}
+              basePath={ORDERS_TRANSPORT_BASE_PATH}
               pathname={pathname}
               collapsed={collapsed}
-              open={ordersCipOpen}
-              onToggle={() => setOrdersCipOpen((prev) => !prev)}
-              items={ordersCipChildren}
+              open={ordersTransportOpen}
+              onToggle={() => setOrdersTransportOpen((prev) => !prev)}
+              items={ordersTransportChildren}
+            />
+
+            <NavGroup
+              icon={ShoppingCart}
+              label={tNav("ordersMaterials")}
+              basePath={ORDERS_MATERIALS_BASE_PATH}
+              pathname={pathname}
+              collapsed={collapsed}
+              open={ordersMaterialsOpen}
+              onToggle={() => setOrdersMaterialsOpen((prev) => !prev)}
+              items={ordersMaterialsChildren}
             />
 
             <NavGroup

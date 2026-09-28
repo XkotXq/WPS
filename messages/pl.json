@@ -27,10 +27,12 @@
     "materialsListSm": "Lista materiałów SM",
     "materialsHistorySm": "Historia operacji SM",
     "materialsCatalogSm": "Katalog materiałów SM",
-    "ordersCip": "Zamówienia",
-    "ordersCipList": "Lista zamówień",
-    "ordersCipGuidelines": "Wytyczne do zamówień",
-    "ordersCipHistory": "Historia zamówień",
+    "ordersTransport": "Transporty",
+    "ordersTransportList": "Lista transportów",
+    "ordersTransportGuidelines": "Wytyczne do transportów",
+    "ordersTransportHistory": "Historia transportów",
+    "ordersMaterials": "Zamówienia",
+    "ordersMaterialsSearch": "Wyszukiwarka zamówień",
     "ordersWms": "Wydania WMS",
     "ordersWmsLists": "Listy wydań",
     "search": "Szukaj",
@@ -271,12 +273,12 @@
       "note": "Zapis w systemie będzie dostępny wkrótce."
     }
   },
-  "ordersCip": {
-    "title": "Lista zamówień",
-    "subtitle": "Zamówienia złożone do magazynu głównego. Dane demonstracyjne - integracja z CIP jest w przygotowaniu.",
+  "ordersTransport": {
+    "title": "Lista transportów",
+    "subtitle": "Transporty zlecone do magazynu głównego. Dane demonstracyjne - integracja z CIP jest w przygotowaniu.",
     "count": "Pozycji: {count}",
-    "emptyStatus": "Brak zamówień spełniających kryteria wyszukiwania.",
-    "newOrder": "Nowe zamówienie",
+    "emptyStatus": "Brak transportów spełniających kryteria wyszukiwania.",
+    "newOrder": "Nowy transport",
     "types": {
       "water_refill": "Dolewanie wody",
       "material_order": "Zamówienie materiału",
@@ -297,7 +299,7 @@
       "type": "Typ",
       "status": "Status",
       "line": "Linia",
-      "employeeNo": "Zamawiający",
+      "employeeNo": "Zlecający",
       "fulfilledBy": "Zrealizował",
       "createdAt": "Data utworzenia",
       "note": "Dodatkowe informacje"
@@ -309,7 +311,7 @@
       "cancelled": "Anulowane"
     },
     "newOrderPanel": {
-      "titleFor": "Nowe zamówienie: {type}",
+      "titleFor": "Nowy transport: {type}",
       "fields": {
         "to": "Dokąd dostarczyć",
         "toShort": "Dokąd",
@@ -329,22 +331,72 @@
       },
       "addItemLabel": "Dodaj materiał",
       "addItemPlaceholder": "Szukaj po numerze lub nazwie...",
+      "addItemPlaceholderNeedOrderNo": "Najpierw wpisz numer zamówienia powyżej",
+      "orderMaterialsLoading": "Pobieranie materiałów zamówienia z CIP...",
+      "orderMaterialsError": "Nie udało się pobrać materiałów zamówienia z CIP.",
+      "orderMaterialsLabel": "Materiały dla zamówienia {orderNo}",
+      "otherMaterialsLabel": "Pozostałe materiały",
       "noMatches": "Brak wyników",
       "removeRow": "Usuń pozycję",
       "cancel": "Anuluj",
-      "save": "Złóż zamówienie"
+      "save": "Zleć transport"
     }
   },
-  "ordersCipGuidelines": {
-    "title": "Wytyczne do zamówień",
-    "subtitle": "Tutaj pojawią się wytyczne dotyczące składania zamówień. Ta sekcja jest w przygotowaniu."
+  "ordersTransportGuidelines": {
+    "title": "Wytyczne do transportów",
+    "subtitle": "Ustaw, co wózkowy ma wiedzieć przy dostawie danego materiału na daną linię - np. \"krótkie odcinki\" dla 600tex na SH02.",
+    "lineLabel": "Linia",
+    "linesSelected": "(wybrano: {count})",
+    "materialLabel": "Materiał",
+    "materialPlaceholder": "Szukaj po numerze lub nazwie...",
+    "noMatches": "Brak wyników",
+    "noteLabel": "Wytyczna",
+    "notePlaceholder": "np. krótkie odcinki",
+    "save": "Zapisz",
+    "cancelEdit": "Anuluj edycję",
+    "columns": {
+      "line": "Linia",
+      "material": "Materiał",
+      "note": "Wytyczna"
+    },
+    "edit": "Edytuj",
+    "remove": "Usuń",
+    "empty": "Brak wytycznych - dodaj pierwszą powyżej.",
+    "saveError": "Nie udało się zapisać wytycznej.",
+    "removeError": "Nie udało się usunąć wytycznej.",
+    "loadError": "Nie udało się pobrać wytycznych."
   },
-  "ordersCipHistory": {
-    "title": "Historia zamówień"
+  "ordersTransportHistory": {
+    "title": "Historia transportów"
   },
-  "ordersCipReports": {
+  "ordersTransportReports": {
     "title": "Raporty",
-    "subtitle": "Tutaj pojawią się raporty dotyczące zamówień. Ta sekcja jest w przygotowaniu."
+    "subtitle": "Tutaj pojawią się raporty dotyczące transportów. Ta sekcja jest w przygotowaniu."
+  },
+  "ordersMaterials": {
+    "title": "Zamówienia",
+    "subtitle": "Wyszukaj zamówienie produkcyjne z CIP i sprawdź, jakich materiałów z magazynu SM potrzebuje.",
+    "searchLabel": "Numer zamówienia",
+    "searchPlaceholder": "np. 260010309034801 albo 260010309034801(4)",
+    "searchButton": "Szukaj",
+    "searching": "Szukanie...",
+    "notFound": "Nie znaleziono zamówienia w CIP.",
+    "error": "Nie udało się wyszukać zamówienia.",
+    "sessionExpired": "Sesja CIP wygasła - zaloguj się ponownie.",
+    "multipleLines": "Zamówienie ma kilka linii produkcyjnych - materiały każdej z nich są pokazane osobno.",
+    "line": "Linia {line}",
+    "segment": "Segment",
+    "columns": {
+      "itemCode": "Numer materiału",
+      "name": "Nazwa",
+      "unit": "Jednostka",
+      "qty": "Ilość na 1 szt.",
+      "requiredQuantity": "Ilość łącznie"
+    },
+    "empty": "Brak materiałów z magazynu SM dla tego zamówienia.",
+    "changeDetails": {
+      "changedAt": "Data zmiany"
+    }
   },
   "ordersWms": {
     "title": "Wydania WMS",

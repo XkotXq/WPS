@@ -27,10 +27,12 @@
     "materialsListSm": "SM Materials List",
     "materialsHistorySm": "SM Operation History",
     "materialsCatalogSm": "SM Materials Catalog",
-    "ordersCip": "Orders",
-    "ordersCipList": "Order list",
-    "ordersCipGuidelines": "Order guidelines",
-    "ordersCipHistory": "Order history",
+    "ordersTransport": "Transports",
+    "ordersTransportList": "Transport list",
+    "ordersTransportGuidelines": "Transport guidelines",
+    "ordersTransportHistory": "Transport history",
+    "ordersMaterials": "Orders",
+    "ordersMaterialsSearch": "Order search",
     "ordersWms": "WMS Issues",
     "ordersWmsLists": "Issue lists",
     "search": "Search",
@@ -271,12 +273,12 @@
       "note": "Saving to the system will be available soon."
     }
   },
-  "ordersCip": {
-    "title": "Order list",
-    "subtitle": "Orders placed to the main warehouse. Demo data - CIP integration is coming soon.",
+  "ordersTransport": {
+    "title": "Transport list",
+    "subtitle": "Transports requested to the main warehouse. Demo data - CIP integration is coming soon.",
     "count": "Items: {count}",
-    "emptyStatus": "No orders match the search.",
-    "newOrder": "New order",
+    "emptyStatus": "No transports match the search.",
+    "newOrder": "New transport",
     "types": {
       "water_refill": "Water refill",
       "material_order": "Material order",
@@ -297,7 +299,7 @@
       "type": "Type",
       "status": "Status",
       "line": "Line",
-      "employeeNo": "Ordered by",
+      "employeeNo": "Requested by",
       "fulfilledBy": "Fulfilled by",
       "createdAt": "Created at",
       "note": "Additional information"
@@ -309,7 +311,7 @@
       "cancelled": "Cancelled"
     },
     "newOrderPanel": {
-      "titleFor": "New order: {type}",
+      "titleFor": "New transport: {type}",
       "fields": {
         "to": "Deliver to",
         "toShort": "To",
@@ -329,22 +331,72 @@
       },
       "addItemLabel": "Add material",
       "addItemPlaceholder": "Search by number or name...",
+      "addItemPlaceholderNeedOrderNo": "Enter the order number above first",
+      "orderMaterialsLoading": "Fetching order materials from CIP...",
+      "orderMaterialsError": "Failed to fetch the order materials from CIP.",
+      "orderMaterialsLabel": "Materials for order {orderNo}",
+      "otherMaterialsLabel": "Other materials",
       "noMatches": "No matches",
       "removeRow": "Remove row",
       "cancel": "Cancel",
-      "save": "Place order"
+      "save": "Place transport"
     }
   },
-  "ordersCipGuidelines": {
-    "title": "Order guidelines",
-    "subtitle": "Guidelines for placing orders will appear here. This section is coming soon."
+  "ordersTransportGuidelines": {
+    "title": "Transport guidelines",
+    "subtitle": "Set what the forklift operator should know when delivering a given material to a given line - e.g. \"short lengths\" for 600tex on SH02.",
+    "lineLabel": "Line",
+    "linesSelected": "(selected: {count})",
+    "materialLabel": "Material",
+    "materialPlaceholder": "Search by number or name...",
+    "noMatches": "No matches",
+    "noteLabel": "Guideline",
+    "notePlaceholder": "e.g. short lengths",
+    "save": "Save",
+    "cancelEdit": "Cancel editing",
+    "columns": {
+      "line": "Line",
+      "material": "Material",
+      "note": "Guideline"
+    },
+    "edit": "Edit",
+    "remove": "Remove",
+    "empty": "No guidelines yet - add the first one above.",
+    "saveError": "Failed to save the guideline.",
+    "removeError": "Failed to remove the guideline.",
+    "loadError": "Failed to fetch the guidelines."
   },
-  "ordersCipHistory": {
-    "title": "Order history"
+  "ordersTransportHistory": {
+    "title": "Transport history"
   },
-  "ordersCipReports": {
+  "ordersTransportReports": {
     "title": "Reports",
-    "subtitle": "Order reports will be shown here. This section is coming soon."
+    "subtitle": "Transport reports will be shown here. This section is coming soon."
+  },
+  "ordersMaterials": {
+    "title": "Orders",
+    "subtitle": "Look up a CIP production order and see which materials it needs from the SM warehouse.",
+    "searchLabel": "Order number",
+    "searchPlaceholder": "e.g. 260010309034801 or 260010309034801(4)",
+    "searchButton": "Search",
+    "searching": "Searching...",
+    "notFound": "No matching order found in CIP.",
+    "error": "Failed to search for the order.",
+    "sessionExpired": "CIP session expired - please log in again.",
+    "multipleLines": "This order has several production lines - each one's materials are shown separately.",
+    "line": "Line {line}",
+    "segment": "Segment",
+    "columns": {
+      "itemCode": "Material number",
+      "name": "Name",
+      "unit": "Unit",
+      "qty": "Qty per unit",
+      "requiredQuantity": "Total qty"
+    },
+    "empty": "No SM warehouse materials for this order.",
+    "changeDetails": {
+      "changedAt": "Changed at"
+    }
   },
   "ordersWms": {
     "title": "WMS Issues",

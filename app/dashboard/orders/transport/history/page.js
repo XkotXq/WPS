@@ -1,8 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import OrdersCipListTable from "@/components/OrdersCipListTable";
 
-export default async function OrdersCipHistoryPage() {
-  const t = await getTranslations("ordersCipHistory");
+export default async function OrdersTransportHistoryPage() {
+  const t = await getTranslations("ordersTransportHistory");
 
   return (
     <div>

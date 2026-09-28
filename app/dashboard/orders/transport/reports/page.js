@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 
-export default async function OrdersCipReportsPage() {
-  const t = await getTranslations("ordersCipReports");
+export default async function OrdersTransportReportsPage() {
+  const t = await getTranslations("ordersTransportReports");
 
   return (
     <div>
