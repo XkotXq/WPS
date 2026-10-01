@@ -84,18 +84,26 @@ export default function LineMaterialRulesTable() {
   // request per line rather than a batch endpoint: this table is a small,
   // rarely-edited reference list, not a bulk-import path.
   async function handleSave() {
-    if (!selectedLines.length || !selectedItem || !note.trim() || saving) return;
+    // The material is optional - without one the guideline covers the
+    // whole line, whatever is brought to it (see wpsApi's own
+    // upsertLineMaterialRule).
+    if (!selectedLines.length || !note.trim() || saving) return;
     setSaving(true);
     setError("");
     try {
       const saved = await Promise.all(
-        selectedLines.map((lineName) => lineMaterialRulesApi.upsert({ lineName, itemNo: selectedItem.itemNo, note: note.trim() }))
+        selectedLines.map((lineName) =>
+          lineMaterialRulesApi.upsert({ lineName, itemNo: selectedItem?.itemNo ?? null, note: note.trim() })
+        )
       );
       setRules((prev) => {
-        const savedKeys = new Set(saved.map((r) => `${r.lineName}|${r.itemNo}`));
-        const next = prev.filter((r) => !savedKeys.has(`${r.lineName}|${r.itemNo}`));
+        const savedKeys = new Set(saved.map((r) => `${r.lineName}|${r.itemNo ?? ""}`));
+        const next = prev.filter((r) => !savedKeys.has(`${r.lineName}|${r.itemNo ?? ""}`));
         return [...next, ...saved].sort(
-          (a, b) => a.lineName.localeCompare(b.lineName) || a.itemNo.localeCompare(b.itemNo)
+          // Line-wide rules first within a line - they are the broader
+          // statement, and itemNo is null on them so a bare localeCompare
+          // would throw.
+          (a, b) => a.lineName.localeCompare(b.lineName) || (a.itemNo ?? "").localeCompare(b.itemNo ?? "")
         );
       });
       resetForm();
@@ -206,7 +214,7 @@ export default function LineMaterialRulesTable() {
         </label>
 
         <div className="flex gap-2">
-          <Button onClick={handleSave} disabled={!selectedLines.length || !selectedItem || !note.trim() || saving}>
+          <Button onClick={handleSave} disabled={!selectedLines.length || !note.trim() || saving}>
             {t("save")}
           </Button>
           {editingId && (
@@ -243,8 +251,17 @@ export default function LineMaterialRulesTable() {
                 <TableRow key={rule.id}>
                   <TableCell className="pl-4 font-medium text-gray-900 dark:text-neutral-100">{rule.lineName}</TableCell>
                   <TableCell>
-                    <span className="font-medium text-gray-900 dark:text-neutral-100">{rule.itemName || rule.itemNo}</span>
-                    <span className="ml-1.5 text-gray-400 dark:text-neutral-500">{rule.itemNo}</span>
+                    {/* A guideline with no material covers the whole line - said
+                        in words rather than left as an empty cell, which
+                        would read as missing data. */}
+                    {rule.itemNo ? (
+                      <>
+                        <span className="font-medium text-gray-900 dark:text-neutral-100">{rule.itemName || rule.itemNo}</span>
+                        <span className="ml-1.5 text-gray-400 dark:text-neutral-500">{rule.itemNo}</span>
+                      </>
+                    ) : (
+                      <span className="italic text-gray-500 dark:text-neutral-400">{t("allMaterials")}</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-gray-600 dark:text-neutral-300">{rule.note}</TableCell>
                   <TableCell className="pr-4">

@@ -31,6 +31,7 @@
     "ordersTransportList": "Transport list",
     "ordersTransportGuidelines": "Transport guidelines",
     "ordersTransportHistory": "Transport history",
+    "ordersTransportLoginHistory": "Login history",
     "ordersMaterials": "Orders",
     "ordersMaterialsSearch": "Order search",
     "ordersWms": "WMS Issues",
@@ -275,10 +276,25 @@
   },
   "ordersTransport": {
     "title": "Transport list",
-    "subtitle": "Transports requested to the main warehouse. Demo data - CIP integration is coming soon.",
+    "subtitle": "Transports requested to the main warehouse.",
     "count": "Items: {count}",
     "emptyStatus": "No transports match the search.",
     "newOrder": "New transport",
+    "loading": "Loading...",
+    "loadError": "Failed to load the transport list.",
+    "actions": {
+      "take": "Take",
+      "complete": "Complete",
+      "cancel": "Cancel",
+      "cancelReasonPrompt": "Cancellation reason (optional):",
+      "accept": "Confirm",
+      "reportProblem": "Report a problem",
+      "resolveProblem": "Problem solved",
+      "problemNotePrompt": "What is wrong? (the forklift operator will put it right)",
+      "problemWithVendor": "With the forklift operator"
+    },
+    "itemIssued": "Issued: {value}",
+    "itemBatch": "Batch: {value}",
     "types": {
       "water_refill": "Water refill",
       "material_order": "Material order",
@@ -289,11 +305,14 @@
     },
     "details": {
       "water": "Water type",
-      "clean": "Clean",
-      "dirty": "Dirty",
+      "clean": "Clean water",
+      "dirty": "Mauser for dirty water",
       "productionOrderNo": "Order number"
     },
-    "viewMode": { "table": "Table", "cards": "Cards" },
+    "viewMode": {
+      "table": "Table",
+      "cards": "Cards"
+    },
     "columns": {
       "orderNo": "Transport number",
       "type": "Type",
@@ -302,13 +321,16 @@
       "employeeNo": "Requested by",
       "fulfilledBy": "Fulfilled by",
       "createdAt": "Created at",
-      "note": "Additional information"
+      "note": "Additional information",
+      "actions": "Actions"
     },
     "status": {
       "new": "New",
       "inProgress": "In progress",
+      "delivered": "Delivered",
       "done": "Completed",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "problem": "Problem"
     },
     "newOrderPanel": {
       "titleFor": "New transport: {type}",
@@ -340,6 +362,18 @@
       "removeRow": "Remove row",
       "cancel": "Cancel",
       "save": "Place transport"
+    },
+    "photoOpenOriginal": "Open the original",
+    "timeline": {
+      "title": "History",
+      "created": "Order placed",
+      "taken": "Taken for fulfilment",
+      "resumed": "Problem solved - work resumed",
+      "problem": "Problem reported",
+      "delivered": "Delivered",
+      "done": "Receipt confirmed",
+      "doneAuto": "Confirmed automatically (no response)",
+      "cancelled": "Cancelled"
     }
   },
   "ordersTransportGuidelines": {
@@ -347,7 +381,7 @@
     "subtitle": "Set what the forklift operator should know when delivering a given material to a given line - e.g. \"short lengths\" for 600tex on SH02.",
     "lineLabel": "Line",
     "linesSelected": "(selected: {count})",
-    "materialLabel": "Material",
+    "materialLabel": "Material (optional)",
     "materialPlaceholder": "Search by number or name...",
     "noMatches": "No matches",
     "noteLabel": "Guideline",
@@ -364,10 +398,25 @@
     "empty": "No guidelines yet - add the first one above.",
     "saveError": "Failed to save the guideline.",
     "removeError": "Failed to remove the guideline.",
-    "loadError": "Failed to fetch the guidelines."
+    "loadError": "Failed to fetch the guidelines.",
+    "allMaterials": "All materials"
   },
   "ordersTransportHistory": {
     "title": "Transport history"
+  },
+  "ordersTransportLoginHistory": {
+    "title": "Login history",
+    "subtitle": "Who logged in and on which forklift - only shown for PDA (smpda) logins that have a forklift label set.",
+    "count": "Items: {count}",
+    "loading": "Loading...",
+    "loadError": "Failed to load the login history.",
+    "retry": "Try again",
+    "empty": "No login events.",
+    "columns": {
+      "employeeNo": "Employee",
+      "deviceLabel": "Forklift",
+      "loggedInAt": "Logged in at"
+    }
   },
   "ordersTransportReports": {
     "title": "Reports",

@@ -1,7 +1,15 @@
 # Project context
 
-This is the **WMS dashboard** ("wps") in a 3-app warehouse stock-tracking
-system for FRP / coated-FRP / filler materials:
+This is the **WMS dashboard** ("wps") in a warehouse stock-tracking system
+for FRP / coated-FRP / filler materials. Six directories, one backend;
+besides the three described in detail below there are three Flutter apps,
+each for a different person's job (each has its own AGENTS.md):
+`../smpda` (warehouse operator's Honeywell PDA - scans and issues the real
+stock), `../smVendor` (forklift operator - takes a transport order, marks it
+delivered) and `../smOrder` (line foreman - places transport orders).
+`../dockerPostgresql` runs the local Postgres, Hasura and MinIO.
+
+The three web pieces:
 
 - `../wpsApi` (pushed to GitHub as `wpsapi`/`wpsApi`) — Express +
   Postgres backend, developed and run directly from that directory on
@@ -233,22 +241,79 @@ Known gotchas worth knowing before editing:
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## Zamówienia (orders) - current state
-"Lista zamówień" (`components/OrdersCipListTable.js`) is a local-only demo on
-`lib/ordersCipSeed.js` (component state, no backend): one flat table, status
-as a badge and a "Typ" column, and one "Nowe zamówienie" button that opens a
-menu of the order types; the chosen type opens a centered dialog with just that
-type's inputs (`ORDER_TYPES` in the component: line pickers from the fixed line
-codes (for "Transport półproduktów": suggestions from every place known so far, any
-typed text accepted and remembered - `LocationInput`), clean/dirty water, production
-order number, materials searched in
-`sm_catalog` with the unit read from it), and for transport / waste / return one optional
-photo picked from the computer (click or drag; kept only as a blob URL in the browser tab -
-nothing is uploaded until storage is decided; shown as a thumbnail when the order is expanded). "Historia zamówień",
-"Wytyczne do zamówień" and "Raporty" are placeholders. The real data model
-(transport orders of six types, order numbers, shifts A/B/C, photos), the
-decisions taken and the roadmap (JWT auth -> Hasura -> these screens on Hasura)
-are in `../wpsApi/AGENTS.md` ("Transport orders" and "Roadmap").
-Intended split once real: list = new + in progress, history = done + cancelled.
+**Real, backed by wpsApi** (`lib/ordersApi.js` -> its `orders`/`order_items`
+tables; no longer the `lib/ordersCipSeed.js` demo). "Lista zamówień" is
+`scope=active` (new + in_progress + problem + delivered), "Historia zamówień" is
+`scope=history` (done + cancelled), both in
+`components/OrdersCipListTable.js`, re-fetched on a 5 s poll (deliberately
+plain REST, not a Hasura subscription - see wpsApi's AGENTS.md roadmap for
+why). Two view modes: a table and cards.
+
+This dashboard is **one of four clients of the same orders**, and which
+person does what matters when changing any of it:
+- `../smOrder` - the line foreman places orders and watches them.
+- `../smpda` - the warehouse operator scans and issues the materials.
+- `../smVendor` - the forklift operator takes an order and marks it
+  delivered, or reports a problem.
+- here - the supervisor's overview, **and the requester's close-out**:
+  - a `delivered` row shows **"Zgadza się"** (`POST /orders/:id/accept`)
+    and **"Zgłoś problem"** instead of the generic take/complete/cancel,
+    which no longer apply to it. Doing nothing is also valid: wpsApi
+    auto-accepts a delivered order after 10 minutes.
+    **"Zgłoś problem" posts to `/problem`, not `/cancel`** (it did until
+    2026-10-01): rejecting a delivery does not end the transport, it undoes
+    the delivery and hands it back to the forklift operator to put right.
+    A description is required.
+  - a `problem` row stays on the active list and shows the reporter's own
+    description in red, in both the table and the cards. The
+    **"Problem rozwiązany"** button (`POST /orders/:id/problem/resolve`)
+    appears only when `problemReportedFrom === "inProgress"` - the operator
+    got stuck, so this is the requester's to answer. When it is
+    `"delivered"` the problem is the operator's to answer in smVendor, and
+    this screen says so instead of offering a button: the side that
+    reported a problem must not be able to close its own report.
+
+Reconstructing what happened is **`OrderEventLog`** in the expanded row,
+and **this dashboard is the only client that shows it** - the phone apps
+deliberately show what to do now, not the history:
+`ordersApi.events(id)` -> `GET /orders/:id/events`, fetched per row on
+expand (not with the list - it is detail nobody needs for every row). It is
+the only place a resolved problem still exists, since the order row carries
+just the current state. Distinct from `OrderStageTimeline`, which
+compresses the *current* position into one line and so cannot show a step
+that repeated. `actor === "auto"` means the 10-minute sweep closed it and
+nobody actually confirmed - say so, don't flatten it to a confirmation.
+
+Things in this component that are easy to get wrong:
+- **"Zrealizował" is not whoever closed the order.** The API's
+  `fulfilledBy` is `delivered_by || taken_by || completed_by` - the person
+  who actually carried the transport out. Don't "fix" it to `completedBy`
+  (which is also sent, raw). See wpsApi's AGENTS.md.
+- **The "Wydano" line** is `issuedLineValue()`: `{issued} {unit}/{ordered} szt.`,
+  and for FRP one segment per drum (`SZP-1(2.3km) + SZP-2(4.85km)/2 szt.`),
+  because an FRP order is placed in pieces but issued in km. The separate
+  ordered-quantity line was removed - this one carries both.
+- **`OrderStageTimeline`** (the compact stage/timestamp strip) belongs in
+  the expanded row next to the **CIP production order number**
+  (`details.productionOrderNo`), not next to our own generated `orderNo`.
+- **Material substitutions**: a BOM row's `itemCode`/`name` already are the
+  changed-to item (wpsApi normalizes them) - don't re-derive the swap here,
+  that is exactly how the "Zamówienie materiału" picker once ordered the
+  stale pre-swap number.
+
+New-order form: `ORDER_TYPES` in the same component drives which inputs each
+of the six types gets (line pickers from the fixed codes; free-text
+`LocationInput` with remembered suggestions for "Transport półproduktów";
+clean water vs. mauser for dirty water; production order number, whose
+typed fragment is resolved against CIP's own BOM to scope the material
+picker). The optional photo for transport / waste / return is **still
+browser-only here** (a blob URL, never uploaded) even though the upload path
+now exists end-to-end - see wpsApi's "Photos" section; smOrder is the client
+that actually attaches one.
+
+"Wytyczne do zamówień" and "Raporty" are still placeholders. The data model
+(six types, order numbers, shifts A/B/C, statuses, photos) is in
+`../wpsApi/AGENTS.md` ("Transport orders").
 
 # This is NOT the Next.js you know
 

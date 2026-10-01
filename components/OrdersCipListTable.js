@@ -8,15 +8,18 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import FrpFilters from "@/components/FrpFilters";
-import { ORDERS_CIP_SEED } from "@/lib/ordersCipSeed";
+import { ordersApi } from "@/lib/ordersApi";
 import { smCatalogApi } from "@/lib/smCatalogApi";
 import { lineMaterialRulesApi } from "@/lib/lineMaterialRulesApi";
 import { searchCipOrderMaterials } from "@/lib/cipOrdersApi";
 import { getCipSession } from "@/lib/cipSession";
 import { sanitizeQuantityInput } from "@/lib/quantityInput";
 
-// Same real line codes as ordersCipSeed.js's own data (see that file's
-// comment) - SH01-07, ST01-13, FC01-03, FL01, not a made-up "Linia 1/2/3/4".
+// The plant's real line codes - SH01-07, ST01-13, FC01-03, FL01, not a
+// made-up "Linia 1/2/3/4" - same series schema.sql's `locations` seeds.
+// Used as a fallback before ordersApi.locations() resolves (see
+// `locationPool`'s own initial state) and as the fixed picker for every
+// order type but the free-text goods_transport.
 const LINE_CODES = [
   ...Array.from({ length: 7 }, (_, i) => `SH0${i + 1}`),
   ...Array.from({ length: 13 }, (_, i) => `ST${String(i + 1).padStart(2, "0")}`),
@@ -31,7 +34,7 @@ const LINE_CODES = [
 // is the clean/dirty choice, `photo` one optional picture picked from the computer,
 // `productionOrderNo` the one production order the
 // whole order is filled under, `items` a list of catalog materials with a
-// quantity. Mirrors wpsApi's src/orders.draft.sql (see its AGENTS.md); the
+// quantity. Mirrors wpsApi's src/schema.sql (see its AGENTS.md); the
 // inputs per type are still being decided, so this is the one place to change.
 // "Zamówienie szpul" has no agreed inputs yet - it asks like a material order,
 // minus the production order number.
@@ -61,82 +64,62 @@ const LABEL_CLS = "text-xs font-medium text-gray-500 dark:text-neutral-400";
 // order_items' own fixed unit - see addItem's own comment.
 const ITEM_UNIT = "szt.";
 
+// A photo attached to an order (uploaded from smOrder - see wpsApi's
+// "Photos"): a thumbnail that opens the full picture in a dialog on this
+// page. It used to be a plain link that threw you into a new browser tab
+// showing the raw file, which loses the order you were looking at.
+//
+// `photo.url` is a short-lived presigned link wpsApi re-issues on every
+// read, so this never caches or stores it - the dialog shows whatever the
+// current render was given. "Otwórz oryginał" is kept for the cases a
+// dialog cannot serve: saving the file, or zooming further in the browser's
+// own viewer.
+function PhotoThumbnail({ photo, className, t }) {
+  const [open, setOpen] = useState(false);
+  if (!photo?.url) return null;
+  return (
+    <>
+      <button
+        type="button"
+        title={photo.name}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="inline-block cursor-zoom-in rounded-md transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-700 dark:focus-visible:ring-navy-400"
+      >
+        <img src={photo.url} alt={photo.name} className={className} />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{photo.name}</DialogTitle>
+          </DialogHeader>
+          {/* Capped by viewport height, not a fixed size: a phone photo is
+              portrait and would otherwise run off the bottom of the dialog. */}
+          <img
+            src={photo.url}
+            alt={photo.name}
+            className="max-h-[70vh] w-full rounded-md object-contain"
+          />
+          <DialogFooter>
+            <a
+              href={photo.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-medium text-navy-700 hover:underline dark:text-navy-300"
+            >
+              {t("photoOpenOriginal")}
+            </a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function RequiredMark() {
   return <span className="text-red-600 dark:text-red-400"> *</span>;
-}
-
-// Next sequential order number for the current year - ZM/<year>/<4-digit
-// running number> matching the seed's own format (see ordersCipSeed.js).
-// Three 8-hour shifts covering the whole day, each defined by its start -
-// mirrors wpsApi's orders.draft.sql (shifts table + order_shift()) exactly,
-// so a real backend can take over order numbering later without the format
-// changing under this demo's feet.
-const SHIFTS = [
-  { code: "A", startHour: 6 },
-  { code: "B", startHour: 14 },
-  { code: "C", startHour: 22 },
-];
-
-// now's wall-clock date/time in Europe/Warsaw, regardless of the browser's
-// own timezone - Intl handles DST so this never needs a manual UTC offset.
-function warsawParts(now) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Europe/Warsaw",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    })
-      .formatToParts(now)
-      .map((p) => [p.type, p.value])
-  );
-  return { year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour === 24 ? 0 : +parts.hour, minute: +parts.minute };
-}
-
-// Which shift `now` falls in: its code, the calendar day it STARTED on (for
-// shift C after midnight that's the day before), the hour of the shift
-// (1-8, by the wall clock) and the plain minute. Same "most recent shift
-// start not in the future" rule as order_shift() in orders.draft.sql - built
-// on a UTC-flagged Date used purely for calendar-day math (year/month/day
-// rollover), never for its own timezone, so it can't drift by an hour.
-function orderShift(now) {
-  const { year, month, day, hour, minute } = warsawParts(now);
-  const nowMinutes = hour * 60 + minute;
-  let best = null;
-  for (const shift of SHIFTS) {
-    let deltaMinutes = nowMinutes - shift.startHour * 60;
-    const shiftDate = new Date(Date.UTC(year, month - 1, day));
-    if (deltaMinutes < 0) {
-      deltaMinutes += 24 * 60;
-      shiftDate.setUTCDate(shiftDate.getUTCDate() - 1);
-    }
-    if (!best || deltaMinutes < best.deltaMinutes) best = { code: shift.code, deltaMinutes, shiftDate };
-  }
-  return { code: best.code, hourOfShift: Math.floor(best.deltaMinutes / 60) + 1, minute, shiftDate: best.shiftDate };
-}
-
-function yymmdd(date) {
-  return `${String(date.getUTCFullYear()).slice(-2)}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
-}
-
-// [shift A/B/C][hour of the shift 1-8][minute 00-59]/[yymmdd of the shift's
-// START day]/[3 random digits], e.g. B137/260924/482 - the random suffix is
-// re-drawn until it isn't already used (this demo's own stand-in for the
-// real backend's advisory-lock-serialized retry loop).
-function nextOrderNo(existingOrders, now = new Date()) {
-  const { code, hourOfShift, minute, shiftDate } = orderShift(now);
-  const base = `${code}${hourOfShift}${String(minute).padStart(2, "0")}/${yymmdd(shiftDate)}`;
-  const taken = new Set(existingOrders.map((o) => o.orderNo));
-  let candidate;
-  let tries = 0;
-  do {
-    candidate = `${base}/${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`;
-    tries += 1;
-  } while (taken.has(candidate) && tries < 100);
-  return candidate;
 }
 
 // "Skąd → dokąd" when an order has both, else the one line it concerns.
@@ -152,18 +135,58 @@ function routeLabel(order) {
 // Case-insensitive: `lineName` here is an order's stored `to`, already its
 // canonical spelling, but comparing loosely costs nothing and avoids a
 // silent miss if that ever isn't true for some order.
-function ruleNoteFor(lineRules, lineName, itemNo) {
-  if (!lineName) return null;
-  const needle = lineName.trim().toLowerCase();
-  return lineRules.find((r) => r.lineName.toLowerCase() === needle && r.itemNo === itemNo)?.note ?? null;
+// Whether anything's actually been issued against this item yet - FRP
+// checks its own per-drum entries (issuedQuantity there is just a count,
+// see wpsApi's order_items_progress), everything else the plain sum.
+function hasIssued(item) {
+  if (item.category === "FRP") return Boolean(item.issuedEntries?.length);
+  return Number(item.issuedQuantity ?? 0) > 0;
 }
 
-// Type-specific values worth showing under an expanded order.
+// "48.400" -> "48.4", "50.000" -> "50" - a quantity shown on screen without
+// trailing zeros. Mirrors smpda's own trimQuantity (lib/core/utils/quantity.dart).
+function trimQuantity(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  let text = n % 1 === 0 ? String(n) : n.toFixed(3);
+  if (text.includes(".")) text = text.replace(/0+$/, "").replace(/\.$/, "");
+  return text;
+}
+
+// The "Wydano: ..." value - two formats, both ending in the ordered piece
+// count (order_items.quantity, always ITEM_UNIT - see that constant's own
+// comment) so this one line replaces the separate ordered-quantity display
+// entirely:
+// - FRP: one segment per drum actually scanned - "SZP-1(2.3km) +
+//   SZP-2(4.85km)" (each entry's own unitId + quantity, catalogUnit
+//   lowercased) - a plain issued/ordered count would only ever say
+//   "2 szt." (how many drums), never which ones or how much cable is on
+//   each.
+// - everything else: "{issuedQuantity} {issuedUnit}/{quantity} szt." - the
+//   real amount issued so far, over how many pieces the order itself
+//   asked for, e.g. "7.5 kg/10 szt.".
+function issuedLineValue(item) {
+  if (item.category === "FRP" && item.issuedEntries?.length) {
+    const unit = (item.catalogUnit || "").toLowerCase();
+    const segments = item.issuedEntries.map((entry) => `${entry.unitId ?? "?"}(${trimQuantity(entry.quantity)}${unit})`);
+    return `${segments.join(" + ")}/${item.quantity} ${ITEM_UNIT}`;
+  }
+  return `${trimQuantity(item.issuedQuantity)} ${item.issuedUnit ?? ""}`.trim() + `/${item.quantity} ${ITEM_UNIT}`;
+}
+
+// Type-specific values worth showing under an expanded order. The
+// productionOrderNo line is pulled out separately (not pushed into `lines`)
+// because OrderStageTimeline belongs right next to it, not next to
+// order.orderNo - see productionOrderNoLine below and its two call sites.
 function detailLines(order, t) {
   const lines = [];
   if (order.details?.water) lines.push(`${t("details.water")}: ${t(order.details.water === "clean" ? "details.clean" : "details.dirty")}`);
-  if (order.details?.productionOrderNo) lines.push(`${t("details.productionOrderNo")}: ${order.details.productionOrderNo}`);
   return lines;
+}
+
+function productionOrderNoLine(order, t) {
+  if (!order.details?.productionOrderNo) return null;
+  return `${t("details.productionOrderNo")}: ${order.details.productionOrderNo}`;
 }
 
 // A place field with suggestions: the shared pool of every place known so far
@@ -860,6 +883,16 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
 const STATUS_STYLES = {
   new: "bg-navy-50 text-navy-700 dark:bg-navy-500/15 dark:text-navy-300",
   inProgress: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+  // "Problem" - the forklift operator can't finish it and is waiting on the
+  // requester (wpsapi's reportOrderProblem). Red, like "anulowane", because
+  // it reads as trouble at a glance - but it is **not** a closed order: it
+  // goes back to "w realizacji" the moment somebody resolves it.
+  problem: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+  // "Dostarczone" (smVendor, wpsapi's orders.js) - the working part is
+  // done but the requester hasn't accepted/reported a problem yet (or the
+  // 10-minute auto-accept hasn't run - see AGENTS.md roadmap). Its own
+  // colour, between "w realizacji" (amber) and "zrealizowane" (emerald).
+  delivered: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400",
   done: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
   cancelled: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400",
 };
@@ -879,6 +912,132 @@ function formatDateTime(value) {
   return new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
+// The order's own lifecycle, in order - "delivered" only appears for an
+// order that actually passed through it (material_order's own
+// "Dostarczone", see wpsApi's deliverOrder - most other types never do).
+// Each stage's `at` is its own timestamp field straight off the order (null
+// = not reached yet). A stage can be skipped entirely (e.g. new ->
+// cancelled direct, no in_progress) - OrderStageTimeline below draws that
+// correctly (a hollow, skipped circle) since each circle's own fill only
+// ever depends on its own `at`, never "everything before the current one".
+function orderStages(order, t) {
+  const stages = [
+    { key: "new", label: t("status.new"), at: order.createdAt },
+    { key: "inProgress", label: t("status.inProgress"), at: order.takenAt },
+  ];
+  // A blocked order gets its own stage rather than sitting on
+  // "w realizacji" with nothing to say it is stuck - the most common
+  // question about such a row is why it hasn't moved. Only while it *is*
+  // blocked: once resolved it is in_progress again, and the one-line
+  // summary is about where the order is now (the full account, every
+  // problem episode included, is OrderEventLog's job).
+  if (order.status === "problem") {
+    stages.push({ key: "problem", label: t("status.problem"), at: order.problemReportedAt });
+  }
+  if (order.deliveredAt) {
+    stages.push({ key: "delivered", label: t("status.delivered"), at: order.deliveredAt });
+  }
+  if (order.status === "cancelled") {
+    stages.push({ key: "cancelled", label: t("status.cancelled"), at: order.cancelledAt });
+  } else {
+    stages.push({ key: "done", label: t("status.done"), at: order.completedAt });
+  }
+  return stages;
+}
+
+// "nazwa etapu i kreska" - minimized to fit right in the same row as
+// order.orderNo itself: every stage's bare name, dash-separated, the
+// current one bold/coloured and the rest muted. No circles, no per-stage
+// timestamp (that got too wide for one row) - the current stage's own
+// "since when" is shown separately, next to it, not per stage here.
+// Every step an order actually went through, oldest first - wpsapi's own
+// order_events (see ordersApi.events). Unlike OrderStageTimeline above,
+// which compresses the *current* position into one line, this is the full
+// account including the steps that repeat: a transport blocked twice has
+// two "Zgłoszono problem" entries here and nowhere else, because the order
+// row only ever holds the latest one.
+//
+// "in_progress" means two different things depending on what precedes it -
+// work starting, or work resuming after a problem - and an event row can't
+// tell them apart on its own. The sequence can, so the label is decided
+// from the previous entry.
+function eventLabel(event, previous, t) {
+  switch (event.kind) {
+    case "created":
+      return t("timeline.created");
+    case "inProgress":
+      return previous?.kind === "problem" ? t("timeline.resumed") : t("timeline.taken");
+    case "problem":
+      return t("timeline.problem");
+    case "delivered":
+      return t("timeline.delivered");
+    // "auto" is wpsapi's own actor for the 10-minute sweep closing an order
+    // nobody answered. Worth saying out loud: "nobody confirmed this" and
+    // "the requester confirmed this" are not the same fact afterwards.
+    case "done":
+      return event.actor === "auto" ? t("timeline.doneAuto") : t("timeline.done");
+    case "cancelled":
+      return t("timeline.cancelled");
+    default:
+      return event.kind;
+  }
+}
+
+function OrderEventLog({ events, t }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-semibold text-gray-500 dark:text-neutral-400">{t("timeline.title")}</span>
+      {events.map((event, i) => {
+        const bad = event.kind === "problem" || event.kind === "cancelled";
+        return (
+          <div key={`${event.at}-${event.kind}-${i}`} className="flex items-baseline gap-2 text-xs">
+            <span className="shrink-0 tabular-nums text-gray-400 dark:text-neutral-500">{formatDateTime(event.at)}</span>
+            <span className={bad ? "font-medium text-red-700 dark:text-red-400" : "font-medium text-gray-700 dark:text-neutral-200"}>
+              {eventLabel(event, events[i - 1], t)}
+            </span>
+            {event.actor && event.actor !== "auto" && (
+              <span className="text-gray-400 dark:text-neutral-500">{event.actor}</span>
+            )}
+            {event.note && <span className="text-gray-500 dark:text-neutral-400">{event.note}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OrderStageTimeline({ order, t }) {
+  const stages = orderStages(order, t);
+  let currentIndex = 0;
+  stages.forEach((s, i) => {
+    if (s.at) currentIndex = i;
+  });
+
+  return (
+    <span className="whitespace-nowrap text-xs">
+      {stages.map((stage, i) => (
+        <Fragment key={stage.key}>
+          {i > 0 && <span className="mx-1 text-gray-300 dark:text-neutral-600">–</span>}
+          <span
+            className={
+              i === currentIndex
+                ? "font-semibold text-navy-700 dark:text-navy-300"
+                : stage.at
+                  ? "text-gray-500 dark:text-neutral-400"
+                  : "text-gray-300 dark:text-neutral-600"
+            }
+          >
+            {stage.label}
+          </span>
+        </Fragment>
+      ))}
+      {stages[currentIndex].at && (
+        <span className="ml-1.5 text-gray-400 dark:text-neutral-500">({formatDateTime(stages[currentIndex].at)})</span>
+      )}
+    </span>
+  );
+}
+
 const HEAD_CLS = "sticky top-0 z-10 bg-gray-50 text-[11px] font-medium tracking-wide text-gray-400 dark:bg-neutral-800 dark:text-neutral-500";
 const CELL_CLS = "text-gray-600 dark:text-neutral-300";
 
@@ -886,10 +1045,11 @@ const CELL_CLS = "text-gray-600 dark:text-neutral-300";
 // right on the card instead of behind a chevron - the point of this view is
 // seeing e.g. "Dolewanie wody" + "Rodzaj wody: Czysta" at a glance, not
 // having to open each order to find out.
-function OrderCard({ order, t, lineRules }) {
+function OrderCard({ order, t, mode, onTake, onComplete, onCancel, onAccept, onReportProblem, onResolveProblem }) {
   const config = ORDER_TYPES.find((entry) => entry.code === order.type);
   const Icon = config?.icon;
   const details = detailLines(order, t);
+  const productionLine = productionOrderNoLine(order, t);
   const items = order.items ?? [];
 
   return (
@@ -907,8 +1067,23 @@ function OrderCard({ order, t, lineRules }) {
         <p className="text-sm text-gray-500 dark:text-neutral-400">{routeLabel(order)}</p>
       </div>
 
-      {details.length > 0 && (
+      {/* A guideline saved for this line with no material - it is about the
+          drive itself, so it sits on the order rather than being repeated
+          under every item (see wpsApi's lineRuleNote). */}
+      {order.lineRuleNote && (
+        <p className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+          {order.lineRuleNote}
+        </p>
+      )}
+
+      {(details.length > 0 || productionLine) && (
         <ul className="space-y-0.5 text-sm text-gray-700 dark:text-neutral-200">
+          {productionLine && (
+            <li className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <span>{productionLine}</span>
+              <OrderStageTimeline order={order} t={t} />
+            </li>
+          )}
           {details.map((line) => (
             <li key={line}>{line}</li>
           ))}
@@ -918,21 +1093,38 @@ function OrderCard({ order, t, lineRules }) {
       {items.length > 0 && (
         <ul className="space-y-1.5 border-t border-gray-100 dark:border-neutral-800 pt-2 text-sm text-gray-700 dark:text-neutral-200">
           {items.map((item) => {
-            const guideline = ruleNoteFor(lineRules, order.to, item.itemNo);
+            const guideline = item.ruleNote;
             return (
               <li key={item.itemNo}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate">
                     {item.itemName} <span className="text-gray-400 dark:text-neutral-500">{item.itemNo}</span>
                   </span>
-                  <span className="shrink-0 tabular-nums">
-                    {item.quantity}
-                    {item.unit ? ` ${item.unit}` : ""}
+                  <span className="shrink-0 text-right tabular-nums">
+                    {/* "Wydano: ..." - FRP shows one segment per drum
+                        actually scanned, everything else a plain
+                        issued/ordered fraction - see issuedLineValue's own
+                        comment. Already ends in "/{ordered} szt.", so this
+                        is the only quantity shown once something's issued -
+                        no separate ordered-quantity line above it. */}
+                    {hasIssued(item) && <span className="block">{t("itemIssued", { value: issuedLineValue(item) })}</span>}
+                    {/* Every distinct batch the issuing scan(s) carried
+                        (smpda's own ScannedCode) - see wpsApi's
+                        order_items_progress, issued_batches. */}
+                    {item.issuedBatches && (
+                      <span className="block text-xs text-gray-400 dark:text-neutral-500">
+                        {t("itemBatch", { value: item.issuedBatches })}
+                      </span>
+                    )}
                   </span>
                 </div>
-                {/* The transport guideline for this exact (line, material) -
-                    what the forklift operator needs to know, e.g. "krótkie
-                    odcinki" - see ruleNoteFor's own comment. */}
+                {/* The transport guideline for this exact (line, material) - what
+                    the forklift operator needs to know, e.g. "krótkie odcinki".
+                    Resolved server-side (wpsApi's order_items_progress), not
+                    matched here: that is what left smpda/smVendor/smOrder showing
+                    nothing while this screen had it. A guideline saved with no
+                    material is about the whole line and rides on the order as
+                    lineRuleNote instead. */}
                 {guideline && (
                   <p className="mt-0.5 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
                     {guideline}
@@ -945,13 +1137,11 @@ function OrderCard({ order, t, lineRules }) {
       )}
 
       {order.photo && (
-        <a href={order.photo.url} target="_blank" rel="noreferrer" title={order.photo.name}>
-          <img
-            src={order.photo.url}
-            alt={order.photo.name}
-            className="h-28 w-full rounded-md border border-gray-200 object-cover dark:border-neutral-700"
-          />
-        </a>
+        <PhotoThumbnail
+          photo={order.photo}
+          t={t}
+          className="h-28 w-full rounded-md border border-gray-200 object-cover dark:border-neutral-700"
+        />
       )}
 
       {order.note && order.note !== "-" && <p className="text-sm text-gray-500 dark:text-neutral-400">{order.note}</p>}
@@ -967,95 +1157,222 @@ function OrderCard({ order, t, lineRules }) {
         )}
         <span>{formatDateTime(order.createdAt)}</span>
       </div>
+
+      {/* Status actions only make sense on the working queue - see wpsapi's
+          take/complete/cancel/acceptOrder and this component's own
+          handlers. A `delivered` row is the requester's own "Zgadza
+          się"/"Zgłoś problem" (what the forklift operator just delivered,
+          via smVendor's "Dostarczone") instead of the generic
+          take/complete/cancel, which don't apply to it any more - see
+          deliverOrder's own comment on why completing it directly would
+          skip that bookkeeping. */}
+      {order.status === "problem" && order.problemNote && (
+        <div className="rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-300">
+          {t("timeline.problem")}: {order.problemNote}
+          {order.problemReportedBy ? ` (${order.problemReportedBy})` : ""}
+        </div>
+      )}
+      {mode === "active" && order.status === "problem" && (
+        <div className="flex items-center gap-1.5 border-t border-gray-100 dark:border-neutral-800 pt-2">
+          {order.problemReportedFrom === "inProgress" ? (
+            <Button size="sm" onClick={() => onResolveProblem(order)}>
+              {t("actions.resolveProblem")}
+            </Button>
+          ) : (
+            <span className="text-xs text-gray-400 dark:text-neutral-500">{t("actions.problemWithVendor")}</span>
+          )}
+        </div>
+      )}
+      {mode === "active" && order.status === "delivered" && (
+        <div className="flex items-center gap-1.5 border-t border-gray-100 dark:border-neutral-800 pt-2">
+          <Button size="sm" variant="outline" onClick={() => onReportProblem(order)}>
+            {t("actions.reportProblem")}
+          </Button>
+          <Button size="sm" onClick={() => onAccept(order)}>
+            {t("actions.accept")}
+          </Button>
+        </div>
+      )}
+      {mode === "active" && order.status !== "delivered" && order.status !== "problem" && (
+        <div className="flex items-center gap-1.5 border-t border-gray-100 dark:border-neutral-800 pt-2">
+          {order.status === "new" && (
+            <Button size="sm" variant="outline" onClick={() => onTake(order)}>
+              {t("actions.take")}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => onComplete(order)}>
+            {t("actions.complete")}
+          </Button>
+          {/* Only while nobody has started it - see the table's own note. */}
+          {order.status === "new" && (
+            <Button size="sm" variant="outline" onClick={() => onCancel(order)}>
+              {t("actions.cancel")}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// Local-only concept table, same status as Materiały SM (see AGENTS.md's
-// "Materiały SM" section) - "Zamówienia" has no backend endpoint yet, so
-// this renders straight from a static seed (lib/ordersCipSeed.js) instead
-// of real CIP order data. Not built on the shared MaterialsTable - that
-// component's columns all read one flat row shape, and an order's own
-// fields (status/line/employeeNo) share nothing with its line items'
-// (itemNo/itemName/quantity), so this instead mirrors SmMaterialsPanel's
-// own hand-rolled groupParent/groupChild expand pattern: a chevron toggles
-// each order row open to reveal what it holds (its type-specific values and
-// its ordered items) indented underneath, same tree-line treatment.
+// Backed by wpsapi's orders/order_items (schema.sql) via lib/ordersApi.js -
+// see that file's own comment and wpsApi's AGENTS.md "Transport orders".
+// Not built on the shared MaterialsTable - that component's columns all
+// read one flat row shape, and an order's own fields (status/line/
+// employeeNo) share nothing with its line items' (itemNo/itemName/
+// quantity), so this instead mirrors SmMaterialsPanel's own hand-rolled
+// groupParent/groupChild expand pattern: a chevron toggles each order row
+// open to reveal what it holds (its type-specific values and its ordered
+// items) indented underneath, same tree-line treatment.
 // Lista zamówień = still open (new/in_progress) - the working queue;
 // Historia zamówień = closed (done/cancelled) - the archive. A closed order
 // leaves the queue the moment it's marked done/cancelled, no grace period -
-// see AGENTS.md's "Zamówienia" section for the reasoning.
-const STATUS_SETS = { active: ["new", "inProgress"], history: ["done", "cancelled"] };
+// see AGENTS.md's "Zamówienia" section for the reasoning. Each mode is its
+// own fetch (`?scope=active`/`?scope=history`) rather than one fetch
+// filtered client-side, straight off wpsapi's own split.
+const SCOPES = { active: "active", history: "history" };
 
 export default function OrdersCipListTable({ mode = "active" }) {
   const t = useTranslations("ordersTransport");
-  const statusSet = STATUS_SETS[mode];
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState({});
-  const [ordersData, setOrdersData] = useState(ORDERS_CIP_SEED);
+  // Per-order event log, keyed by order id, filled on expand (see toggle).
+  const [eventsById, setEventsById] = useState({});
+  const [ordersData, setOrdersData] = useState([]);
+  const [loadStatus, setLoadStatus] = useState("loading"); // loading | ready | error
+  const [locationPool, setLocationPool] = useState(LINE_CODES);
   const [newOrderType, setNewOrderType] = useState(null);
   const [viewMode, setViewMode] = useState("table");
-  // "Wytyczne do transportów" - fetched once here (not per order row) and
-  // matched live per item below (see ruleNoteFor) so an edited/added
-  // guideline shows up on every matching order immediately, without a
-  // reload - same live-lookup idea as the still-draft order_items_with_notes
-  // view (see wpsApi's AGENTS.md).
-  const [lineRules, setLineRules] = useState([]);
+
+  const reload = useMemo(
+    () => () => {
+      setLoadStatus((prev) => (prev === "ready" ? prev : "loading"));
+      ordersApi
+        .list(SCOPES[mode])
+        .then((rows) => {
+          setOrdersData(rows);
+          setLoadStatus("ready");
+        })
+        .catch(() => setLoadStatus("error"));
+    },
+    [mode]
+  );
 
   useEffect(() => {
-    lineMaterialRulesApi.list().then(setLineRules).catch(() => {});
+    reload();
+  }, [reload]);
+
+  // Live updates: every status change (Weź/Zrealizuj/Anuluj/Dostarczone,
+  // wherever it's made from - smVendor and smpda both write to the same
+  // orders table) shows up here on its own, no manual refresh. A plain
+  // poll (not a GraphQL/Hasura subscription): same reasoning as smVendor's
+  // own OrdersPage - Hasura subscriptions are themselves short-interval
+  // polling under the hood (no LISTEN/NOTIFY), so this gets the same felt
+  // "live" behaviour without adding a GraphQL-WS client here. Silent on
+  // failure (unlike reload() above) - a transient hiccup must not blank
+  // the table out from under someone reading it; the next tick retries on
+  // its own.
+  useEffect(() => {
+    const poll = setInterval(() => {
+      ordersApi
+        .list(SCOPES[mode])
+        .then((rows) => setOrdersData(rows))
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(poll);
+  }, [mode]);
+
+  useEffect(() => {
+    // Every known place (fixed lines + whatever was typed on an earlier
+    // goods_transport order) - straight from `locations`, not derived from
+    // whichever orders happen to be loaded in this mode.
+    ordersApi.locations().then(setLocationPool).catch(() => {});
   }, []);
 
-  function toggle(orderNo) {
-    setExpanded((prev) => ({ ...prev, [orderNo]: !prev[orderNo] }));
-  }
-
-  // New order goes straight to "new"/onto the top of the list - same
-  // local-only concept as the rest of this table (see its own comment),
-  // no backend call.
-  function handleCreateOrder({ type, from, to, details, note, photo, employeeNo, items }) {
-    const now = new Date();
-    const orderNo = nextOrderNo(ordersData, now);
-    const order = {
-      id: orderNo,
-      orderNo,
-      type,
-      status: "new",
-      line: to ?? from,
-      from,
-      to,
-      details,
-      employeeNo,
-      fulfilledBy: "-",
-      createdAt: now.toISOString(),
-      note: note || "-",
-      photo,
-      items,
-    };
-    setOrdersData((prev) => [order, ...prev]);
-  }
-
-  // Every place known so far: the fixed lines first, then whatever was typed
-    // on earlier transport orders (each new place joins the list by being on an
-    // order). Same list for everyone.
-  const locationPool = useMemo(() => {
-    const extra = new Set();
-    for (const order of ordersData) {
-      for (const place of [order.from, order.to]) if (place && !LINE_CODES.includes(place)) extra.add(place);
+  // Takes the whole order, not just its number: expanding is also what
+  // triggers the one fetch this screen does per row (its event log).
+  function toggle(order) {
+    const opening = !expanded[order.orderNo];
+    setExpanded((prev) => ({ ...prev, [order.orderNo]: opening }));
+    // Re-fetched every time it is opened rather than cached once: a row
+    // left collapsed for ten minutes has usually moved on since.
+    if (opening) {
+      ordersApi
+        .events(order.id)
+        .then((rows) => setEventsById((prev) => ({ ...prev, [order.id]: rows })))
+        .catch(() => {});
     }
-    return [...LINE_CODES, ...[...extra].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))];
-  }, [ordersData]);
+  }
+
+  // New order always lands as "new" (see wpsapi's createOrder) - always
+  // active mode's own concern, so it's prepended here directly rather than
+  // waiting on a reload; history's own fetch is untouched by this.
+  async function handleCreateOrder(input) {
+    const order = await ordersApi.create(input);
+    if (mode === "active") setOrdersData((prev) => [order, ...prev]);
+  }
+
+  // The three status actions (see wpsapi's take/complete/cancelOrder) - all
+  // three move an order out of "active" (new/in_progress) into either still
+  // active (take: new -> in_progress) or history (complete/cancel) - so a
+  // successful call always just drops the row from whatever's on screen
+  // right now (mode="active") rather than trying to patch its new status in
+  // place; history's own view picks it up on its own next visit/reload.
+  async function handleTake(order) {
+    const session = await getCipSession().catch(() => null);
+    const updated = await ordersApi.take(order.id, session?.userId ?? "");
+    setOrdersData((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+  }
+  async function handleComplete(order) {
+    const session = await getCipSession().catch(() => null);
+    await ordersApi.complete(order.id, session?.userId ?? "");
+    setOrdersData((prev) => prev.filter((o) => o.id !== order.id));
+  }
+  async function handleCancel(order) {
+    const reason = window.prompt(t("actions.cancelReasonPrompt")) ?? "";
+    await ordersApi.cancel(order.id, reason);
+    setOrdersData((prev) => prev.filter((o) => o.id !== order.id));
+  }
+  // "Zgłoś problem" on a delivered row - the requester rejecting what
+  // arrived. Goes into the problem loop (the forklift operator answers it),
+  // never to `cancel`: a rejected delivery is not the end of the transport.
+  // The row stays on the active list, so it is replaced in place.
+  async function handleReportProblem(order) {
+    const note = (window.prompt(t("actions.problemNotePrompt")) ?? "").trim();
+    if (!note) return;
+    const session = await getCipSession().catch(() => null);
+    const updated = await ordersApi.reportProblem(order.id, session?.userId ?? "", note);
+    setOrdersData((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+  }
+  // "Zgadza się" - delivered -> done, the requester's own confirmation that
+  // what the forklift operator delivered (smVendor's "Dostarczone") is
+  // correct. Shown instead of take/complete/cancel for a `delivered` row -
+  // see the actions column's own switch below.
+  async function handleAccept(order) {
+    const session = await getCipSession().catch(() => null);
+    await ordersApi.accept(order.id, session?.userId ?? "");
+    setOrdersData((prev) => prev.filter((o) => o.id !== order.id));
+  }
+
+  // "Problem rozwiązany" - problem -> in_progress, the answer to what the
+  // forklift operator reported. The row stays in this list (it is still an
+  // active order), so unlike accept/cancel above it is replaced in place
+  // rather than removed.
+  async function handleResolveProblem(order) {
+    const session = await getCipSession().catch(() => null);
+    const updated = await ordersApi.resolveProblem(order.id, session?.userId ?? "");
+    setOrdersData((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+  }
 
   const orders = useMemo(() => {
-    const inMode = ordersData.filter((order) => statusSet.includes(order.status));
-    if (!search) return inMode;
+    if (!search) return ordersData;
     const needle = search.toLowerCase();
-    return inMode.filter((order) =>
+    return ordersData.filter((order) =>
       [order.orderNo, t(`types.${order.type}`), routeLabel(order), order.employeeNo, order.note, t(`status.${order.status}`)].some((field) =>
         field?.toLowerCase().includes(needle)
       )
     );
-  }, [ordersData, search, statusSet, t]);
+  }, [ordersData, search, t]);
 
   return (
     <div>
@@ -1123,19 +1440,35 @@ export default function OrdersCipListTable({ mode = "active" }) {
       <div className="mt-4">
         <FrpFilters onGlobalFilterChange={setSearch} />
 
-        {viewMode === "cards" ? (
+        {loadStatus === "error" && (
+          <p className="rounded-lg border border-dashed border-red-200 dark:border-red-900/50 py-8 text-center text-sm text-red-600 dark:text-red-400">
+            {t("loadError")}
+          </p>
+        )}
+        {loadStatus !== "error" && viewMode === "cards" ? (
           orders.length === 0 ? (
             <p className="rounded-lg border border-dashed border-gray-200 dark:border-neutral-800 py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
-              {t("emptyStatus")}
+              {t(loadStatus === "loading" ? "loading" : "emptyStatus")}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {orders.map((order) => (
-                <OrderCard key={order.orderNo} order={order} t={t} lineRules={lineRules} />
+                <OrderCard
+                  key={order.orderNo}
+                  order={order}
+                  t={t}
+                  mode={mode}
+                  onTake={handleTake}
+                  onComplete={handleComplete}
+                  onCancel={handleCancel}
+                  onAccept={handleAccept}
+                  onReportProblem={handleReportProblem}
+                  onResolveProblem={handleResolveProblem}
+                />
               ))}
             </div>
           )
-        ) : (
+        ) : loadStatus !== "error" && (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-neutral-800">
           <Table>
             <TableHeader>
@@ -1148,25 +1481,27 @@ export default function OrdersCipListTable({ mode = "active" }) {
                 <TableHead className={HEAD_CLS}>{t("columns.employeeNo")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.fulfilledBy")}</TableHead>
                 <TableHead className={HEAD_CLS}>{t("columns.createdAt")}</TableHead>
-                <TableHead className={`pr-4 ${HEAD_CLS}`}>{t("columns.note")}</TableHead>
+                <TableHead className={mode === "active" ? HEAD_CLS : `pr-4 ${HEAD_CLS}`}>{t("columns.note")}</TableHead>
+                {mode === "active" && <TableHead className={`pr-4 text-right ${HEAD_CLS}`}>{t("columns.actions")}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {orders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
-                    {t("emptyStatus")}
+                  <TableCell colSpan={mode === "active" ? 10 : 9} className="py-8 text-center text-sm text-gray-400 dark:text-neutral-500">
+                    {t(loadStatus === "loading" ? "loading" : "emptyStatus")}
                   </TableCell>
                 </TableRow>
               )}
               {orders.map((order) => {
                 const details = detailLines(order, t);
+                const productionLine = productionOrderNoLine(order, t);
                 const items = order.items ?? [];
-                const expandable = details.length > 0 || items.length > 0 || Boolean(order.photo);
+                const expandable = details.length > 0 || Boolean(productionLine) || items.length > 0 || Boolean(order.photo);
                 const isOpen = expandable && Boolean(expanded[order.orderNo]);
                 return (
                   <Fragment key={order.orderNo}>
-                    <TableRow onClick={expandable ? () => toggle(order.orderNo) : undefined} className={expandable ? "cursor-pointer" : undefined}>
+                    <TableRow onClick={expandable ? () => toggle(order) : undefined} className={expandable ? "cursor-pointer" : undefined}>
                       <TableCell className="w-8 pl-4">
                         {expandable &&
                           (isOpen ? (
@@ -1184,8 +1519,96 @@ export default function OrdersCipListTable({ mode = "active" }) {
                       <TableCell className={CELL_CLS}>{order.employeeNo}</TableCell>
                       <TableCell className={CELL_CLS}>{order.fulfilledBy}</TableCell>
                       <TableCell className={CELL_CLS}>{formatDateTime(order.createdAt)}</TableCell>
-                      <TableCell className={`pr-4 ${CELL_CLS}`}>{order.note}</TableCell>
+                      <TableCell className={mode === "active" ? CELL_CLS : `pr-4 ${CELL_CLS}`}>{order.note}</TableCell>
+                      {mode === "active" && (
+                        <TableCell className="pr-4" onClick={(e) => e.stopPropagation()}>
+                          {/* A `delivered` row is the requester's own
+                              "Zgadza się"/"Zgłoś problem" - see OrderCard's
+                              own comment on why take/complete/cancel don't
+                              apply to it any more. */}
+                          {order.status === "problem" ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Only the side the problem was reported *to*
+                                  can answer it: a problem the operator
+                                  reported is the requester's to resolve
+                                  (here), one the requester reported is the
+                                  operator's, in smVendor. */}
+                              {order.problemReportedFrom === "inProgress" ? (
+                                <Button size="sm" onClick={() => handleResolveProblem(order)}>
+                                  {t("actions.resolveProblem")}
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-gray-400 dark:text-neutral-500">
+                                  {t("actions.problemWithVendor")}
+                                </span>
+                              )}
+                            </div>
+                          ) : order.status === "delivered" ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button size="sm" variant="outline" onClick={() => handleReportProblem(order)}>
+                                {t("actions.reportProblem")}
+                              </Button>
+                              <Button size="sm" onClick={() => handleAccept(order)}>
+                                {t("actions.accept")}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1.5">
+                              {order.status === "new" && (
+                                <Button size="sm" variant="outline" onClick={() => handleTake(order)}>
+                                  {t("actions.take")}
+                                </Button>
+                              )}
+                              <Button size="sm" variant="outline" onClick={() => handleComplete(order)}>
+                                {t("actions.complete")}
+                              </Button>
+                              {/* Cancelling is for an order nobody has started
+                                  yet - see wpsapi's cancelOrder, which refuses
+                                  the rest. Once it is being carried, the way
+                                  out is the problem loop, not a cancellation,
+                                  and this is the only app that offers it at
+                                  all. */}
+                              {order.status === "new" && (
+                                <Button size="sm" variant="outline" onClick={() => handleCancel(order)}>
+                                  {t("actions.cancel")}
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
+                    {isOpen && productionLine && (
+                      <TableRow className="bg-gray-50/60 dark:bg-neutral-900/40">
+                        <TableCell className="relative w-8 pl-4">
+                          <span className="absolute inset-y-0 left-6 flex w-3.5 justify-center">
+                            <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
+                          </span>
+                        </TableCell>
+                        <TableCell colSpan={mode === "active" ? 9 : 8} className={`pl-2 pr-4 ${CELL_CLS}`}>
+                          <div className="flex items-center justify-between">
+                            <span>{productionLine}</span>
+                            <OrderStageTimeline order={order} t={t} />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {/* The line's own guideline, whatever is being brought -
+                        see OrderCard's own comment. */}
+                    {isOpen && order.lineRuleNote && (
+                      <TableRow className="bg-gray-50/60 dark:bg-neutral-900/40">
+                        <TableCell className="relative w-8 pl-4">
+                          <span className="absolute inset-y-0 left-6 flex w-3.5 justify-center">
+                            <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
+                          </span>
+                        </TableCell>
+                        <TableCell colSpan={mode === "active" ? 9 : 8} className="pl-2 pr-4">
+                          <span className="inline-block rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                            {order.lineRuleNote}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {isOpen && details.length > 0 && (
                       <TableRow className="bg-gray-50/60 dark:bg-neutral-900/40">
                         <TableCell className="relative w-8 pl-4">
@@ -1193,7 +1616,7 @@ export default function OrdersCipListTable({ mode = "active" }) {
                             <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
                           </span>
                         </TableCell>
-                        <TableCell colSpan={8} className={`pl-2 pr-4 ${CELL_CLS}`}>
+                        <TableCell colSpan={mode === "active" ? 9 : 8} className={`pl-2 pr-4 ${CELL_CLS}`}>
                           {details.join(" · ")}
                         </TableCell>
                       </TableRow>
@@ -1205,10 +1628,12 @@ export default function OrdersCipListTable({ mode = "active" }) {
                             <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
                           </span>
                         </TableCell>
-                        <TableCell colSpan={8} className="py-2 pl-2 pr-4">
-                          <a href={order.photo.url} target="_blank" rel="noreferrer" title={order.photo.name} className="inline-block">
-                            <img src={order.photo.url} alt={order.photo.name} className="h-20 rounded-md border border-gray-200 object-cover dark:border-neutral-700" />
-                          </a>
+                        <TableCell colSpan={mode === "active" ? 9 : 8} className="py-2 pl-2 pr-4">
+                          <PhotoThumbnail
+                            photo={order.photo}
+                            t={t}
+                            className="h-20 rounded-md border border-gray-200 object-cover dark:border-neutral-700"
+                          />
                         </TableCell>
                       </TableRow>
                     )}
@@ -1223,25 +1648,74 @@ export default function OrdersCipListTable({ mode = "active" }) {
                           <TableCell className={`pl-2 ${CELL_CLS}`}>{item.itemNo}</TableCell>
                           <TableCell colSpan={2} className={CELL_CLS}>
                             {item.itemName}
-                            {/* The transport guideline for this exact (line,
-                                material) - what the forklift operator needs
-                                to know, e.g. "krótkie odcinki" - see
-                                ruleNoteFor's own comment. */}
-                            {ruleNoteFor(lineRules, order.to, item.itemNo) && (
+                            {/* The transport guideline for this exact (line, material) - what
+                                the forklift operator needs to know, e.g. "krótkie odcinki".
+                                Resolved server-side (wpsApi's order_items_progress), not
+                                matched here: that is what left smpda/smVendor/smOrder showing
+                                nothing while this screen had it. A guideline saved with no
+                                material is about the whole line and rides on the order as
+                                lineRuleNote instead. */}
+                            {item.ruleNote && (
                               <p className="mt-0.5 inline-block rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
-                                {ruleNoteFor(lineRules, order.to, item.itemNo)}
+                                {item.ruleNote}
                               </p>
-                            )}
+                              )}
                           </TableCell>
                           <TableCell className={`tabular-nums ${CELL_CLS}`}>
-                            {item.quantity}
-                            {item.unit ? ` ${item.unit}` : ""}
+                            {/* "Wydano: ..." - see OrderCard's own comment
+                                on issuedLineValue. Already ends in
+                                "/{ordered} szt.", so this is the only
+                                quantity shown once something's issued - no
+                                separate ordered-quantity line above it. */}
+                            {hasIssued(item) && <span className="block">{t("itemIssued", { value: issuedLineValue(item) })}</span>}
+                            {/* Every distinct batch the issuing scan(s)
+                                carried - see OrderCard's own comment. */}
+                            {item.issuedBatches && (
+                              <span className="mt-0.5 block text-xs text-gray-400 dark:text-neutral-500">
+                                {t("itemBatch", { value: item.issuedBatches })}
+                              </span>
+                            )}
                           </TableCell>
-                          <TableCell colSpan={4} className={`pr-4 text-gray-400 dark:text-neutral-500`}>
+                          <TableCell colSpan={mode === "active" ? 5 : 4} className={`pr-4 text-gray-400 dark:text-neutral-500`}>
                             {item.note}
                           </TableCell>
                         </TableRow>
                       ))}
+                    {/* What is blocking it right now, in the operator's own
+                        words - the one thing somebody looking at a stuck
+                        order needs before anything else. */}
+                    {isOpen && order.status === "problem" && order.problemNote && (
+                      <TableRow className="bg-gray-50/60 dark:bg-neutral-900/40">
+                        <TableCell className="relative w-8 pl-4">
+                          <span className="absolute inset-y-0 left-6 flex w-3.5 justify-center">
+                            <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
+                          </span>
+                        </TableCell>
+                        <TableCell colSpan={mode === "active" ? 9 : 8} className="pl-2 pr-4">
+                          <span className="inline-block rounded-md bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                            {t("timeline.problem")}: {order.problemNote}
+                            {order.problemReportedBy ? ` (${order.problemReportedBy})` : ""}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {/* The whole sequence, last - it answers "what
+                        happened here", which only comes up after the order
+                        itself has been read. Absent until the fetch lands,
+                        and absent for good if it fails: a missing log must
+                        not break the row. */}
+                    {isOpen && (eventsById[order.id]?.length ?? 0) > 0 && (
+                      <TableRow className="bg-gray-50/60 dark:bg-neutral-900/40">
+                        <TableCell className="relative w-8 pl-4">
+                          <span className="absolute inset-y-0 left-6 flex w-3.5 justify-center">
+                            <span className="h-full w-px bg-gray-300 dark:bg-neutral-600" />
+                          </span>
+                        </TableCell>
+                        <TableCell colSpan={mode === "active" ? 9 : 8} className="py-2 pl-2 pr-4">
+                          <OrderEventLog events={eventsById[order.id]} t={t} />
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </Fragment>
                 );
               })}

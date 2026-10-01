@@ -28,18 +28,20 @@ function formatQty(n) {
   return typeof n === "number" ? n.toLocaleString("pl-PL", { maximumFractionDigits: 6 }) : (n ?? "");
 }
 
-// A changed row shows the already-substituted material (materialChange.to/
-// toName) as its own itemCode/name, same as CIP's BOM would if it were
-// re-read today - not the stale `itemCode`/`name` the BOM endpoint itself
-// still carries for this row (confirmed live: that's the *original*,
-// pre-swap item - see wpsApi's AGENTS.md, "Order lookup"). Expanding the row
-// is the only place the original still shows, via `materialChange.from` +
-// `.fromName`.
+// A changed row's `itemCode`/`name` are already the substituted material -
+// wpsApi normalizes both to the changed-to item (see its routes/cipOrders.js
+// `withCatalogNames`), so this row reads as what CIP's BOM would say if it
+// were re-planned today. That used to be done here instead, which left
+// every *other* caller of the same endpoint (notably
+// OrdersCipListTable.js's "Zamówienie materiału" picker) ordering the stale
+// pre-swap number - hence the one server-side definition now. Expanding the
+// row is the only place the original still shows, via `materialChange.from`
+// + `.fromName`.
 function displayItemCode(m) {
-  return m.materialChange?.to ?? m.itemCode;
+  return m.itemCode;
 }
 function displayName(m) {
-  return m.materialChange?.toName || m.name;
+  return m.name;
 }
 
 // Chevron column (dedicated `w-8` first column, same as OrdersCipListTable.js/

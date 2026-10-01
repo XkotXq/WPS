@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MaterialsTable from "@/components/MaterialsTable";
 import { smOperationsApi } from "@/lib/smItemsApi";
+import { subscribeSmOperationsChanged } from "@/lib/hasuraClient";
 
 // Same look as the filter row on Lista materiałów SM (SmMaterialsPanel.js).
 const inputClasses =
@@ -171,6 +172,25 @@ const COLUMNS = [
 ];
 
 // A log entry as the table (and the export) shows it.
+// A small, deliberate duplicate of wpsApi's own rowToApi (src/smOperations.js)
+// - see subscribeSmOperationsChanged's own comment for why this one is
+// worth it (a flat, immutable, rarely-changing shape) where SmMaterialsPanel's
+// own live-update deliberately avoids doing the same for sm_items.
+function mapGraphqlOperationRow(row) {
+  return {
+    id: row.id,
+    operation: row.operation,
+    itemNo: row.item_no,
+    itemName: row.item_name,
+    unitId: row.unit_id,
+    quantity: row.quantity,
+    location: row.location_code,
+    productBatch: row.product_batch,
+    operator: row.performed_by,
+    time: row.performed_at,
+  };
+}
+
 function toTableRow(t, entry) {
   return {
     ...entry,
@@ -205,10 +225,21 @@ export default function SmMaterialsHistoryTable() {
   const isDirty = (f) => Boolean(f.itemNo) || Boolean(f.operatorLike) || f.operation.length > 0;
   const hasFilters = isDirty(filters);
 
-  useEffect(() => {
-    setLoading(true);
+  // Shared by the page/filter-driven fetch below and the live-update
+  // subscription further down - `showLoading` is skipped for the latter so
+  // a receipt logged elsewhere doesn't flash the whole table into a loading
+  // state (same idea as SmMaterialsPanel.js's own loadItems).
+  //
+  // Kept behind a ref (reassigned every render, so it always closes over
+  // the current page/filters) rather than called directly from the
+  // subscription effect - that effect only subscribes once, on mount (see
+  // its own comment), so without the ref it would keep calling back into
+  // whatever page/filters were current on that very first render.
+  const loadHistoryRef = useRef();
+  loadHistoryRef.current = function loadHistory({ showLoading = true } = {}) {
+    if (showLoading) setLoading(true);
     setLoadError(false);
-    smOperationsApi
+    return smOperationsApi
       .list(PAGE_SIZE, page * PAGE_SIZE, filters)
       .then(({ rows, total: totalCount }) => {
         setHistory(rows);
@@ -216,7 +247,58 @@ export default function SmMaterialsHistoryTable() {
       })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadHistoryRef.current({ showLoading: true });
   }, [page, filters]);
+
+  // Read by the subscription below instead of closing over `page`/`hasFilters`
+  // directly - same ref trick as loadHistoryRef, needed for the same reason
+  // (the subscription effect only subscribes once, on mount).
+  const viewRef = useRef();
+  viewRef.current = { page, hasFilters };
+
+  // Live updates: a receipt/issue/labeling logged anywhere - another tab,
+  // wps on a different computer, or smpda on the scanner - shows up here
+  // too, without hitting "Szukaj" again. Each tick already carries the
+  // whole new row (see lib/hasuraClient.js) - append-only, so on the common
+  // page (0, unfiltered - "Zrealizował" is watching the newest entries
+  // scroll in) it's just prepended straight in, no fetch at all; elsewhere
+  // (a filtered/paginated view, where whether this row even belongs on
+  // screen depends on server-side matching this component doesn't
+  // replicate) falls back to loadHistoryRef's full page refetch, same as
+  // before. `lastSeenIdRef` starts unset; its first tick (right after
+  // mount) just records the current newest id instead of "prepending" a row
+  // already included in the initial REST load above.
+  const lastSeenIdRef = useRef(null);
+  useEffect(() => {
+    let debounce;
+    let pendingRow = null;
+    const unsubscribe = subscribeSmOperationsChanged(({ sm_operations }) => {
+      pendingRow = sm_operations[0];
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        const row = pendingRow;
+        if (!row || row.id === lastSeenIdRef.current) return;
+        const isFirstTick = lastSeenIdRef.current === null;
+        lastSeenIdRef.current = row.id;
+        if (isFirstTick) return;
+
+        const { page: currentPage, hasFilters: filtered } = viewRef.current;
+        if (currentPage !== 0 || filtered) {
+          loadHistoryRef.current({ showLoading: false });
+          return;
+        }
+        setHistory((prev) => [mapGraphqlOperationRow(row), ...prev].slice(0, PAGE_SIZE));
+        setTotal((prev) => prev + 1);
+      }, 250);
+    });
+    return () => {
+      clearTimeout(debounce);
+      unsubscribe();
+    };
+  }, []);
 
   function handleSearch(event) {
     event.preventDefault();

@@ -33,7 +33,7 @@ const MATERIALS_SM_BASE_PATH = "/dashboard/materials-list-sm";
 const ORDERS_TRANSPORT_BASE_PATH = "/dashboard/orders/transport";
 const ORDERS_MATERIALS_BASE_PATH = "/dashboard/orders/materials";
 const ORDERS_WMS_BASE_PATH = "/dashboard/orders/wms";
-const MAX_RECENT_PAGES = 5;
+const MAX_RECENT_PAGES = 7;
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -122,6 +122,7 @@ export default function DashboardLayout({ children }) {
     { href: "/dashboard/orders/transport", label: tNav("ordersTransportList") },
     { href: "/dashboard/orders/transport/guidelines", label: tNav("ordersTransportGuidelines") },
     { href: "/dashboard/orders/transport/history", label: tNav("ordersTransportHistory") },
+    { href: "/dashboard/orders/transport/login-history", label: tNav("ordersTransportLoginHistory") },
     { href: "/dashboard/orders/transport/reports", label: tNav("reports") },
   ];
 
@@ -140,9 +141,6 @@ export default function DashboardLayout({ children }) {
           }`}
         >
           <div className="flex items-center gap-2 px-2 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-950 dark:bg-navy-500 text-xs font-bold text-white">
-              SM
-            </div>
             {!collapsed && (
               <span className="text-sm font-semibold text-navy-950 dark:text-white">Stock Manager</span>
             )}

@@ -19,6 +19,7 @@ import { getCipSession } from "@/lib/cipSession";
 import { upsertSmItemViaCip } from "@/lib/smItemsCipApi";
 import { smCatalogApi } from "@/lib/smCatalogApi";
 import { smItemsApi, smOperationsApi } from "@/lib/smItemsApi";
+import { subscribeSmItemsChanged } from "@/lib/hasuraClient";
 import { sanitizeQuantityInput } from "@/lib/quantityInput";
 
 // Whether a sm_catalog entry should offer per-spool tracking: its
@@ -1728,6 +1729,56 @@ export default function SmMaterialsPanel() {
 
   useEffect(() => {
     loadItems({ showLoading: true });
+  }, []);
+
+  // Live updates: a receipt/issue/labeling anywhere - another tab, wps on a
+  // different computer, or smpda on the scanner - updates this list here
+  // too, without the operator having to hit "Odśwież" themselves. Each tick
+  // carries every item's own `updatedAt` (see lib/hasuraClient.js), so this
+  // diffs it against what was seen last time and re-fetches (GET
+  // /sm-items/:itemNo) only the item(s) that actually changed - not
+  // `loadItems()`'s whole-list GET, which would otherwise re-pull every
+  // material on screen for a one-item receipt. A `updatedAt` seen before
+  // that's now gone means that item was deleted - dropped locally without
+  // a fetch. `lastSeenRef` starts empty; its very first tick (right after
+  // mount) just records the baseline instead of "changing" every item, since
+  // the mount effect above already loaded them all fresh via REST.
+  const lastSeenRef = useRef(null);
+  useEffect(() => {
+    let debounce;
+    let pendingRows = null;
+    const unsubscribe = subscribeSmItemsChanged(({ sm_items: rows }) => {
+      pendingRows = rows;
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        const seen = lastSeenRef.current;
+        const nextSeen = new Map(pendingRows.map((r) => [r.item_no, r.updated_at]));
+        if (!seen) {
+          lastSeenRef.current = nextSeen;
+          return;
+        }
+        const changedNos = [...nextSeen].filter(([no, updatedAt]) => seen.get(no) !== updatedAt).map(([no]) => no);
+        const removedNos = [...seen.keys()].filter((no) => !nextSeen.has(no));
+        lastSeenRef.current = nextSeen;
+        if (!changedNos.length && !removedNos.length) return;
+
+        const fetched = await Promise.all(changedNos.map((no) => smItemsApi.get(no).catch(() => null)));
+        setItemsRaw((prev) => {
+          const byNo = new Map(prev.map((it) => [it.itemNo, it]));
+          for (const no of removedNos) byNo.delete(no);
+          for (const item of fetched) {
+            // null: gone by the time this fetch landed (race with a delete
+            // elsewhere) - same as an explicit removal.
+            if (item) byNo.set(item.itemNo, item);
+          }
+          return [...byNo.values()];
+        });
+      }, 250);
+    });
+    return () => {
+      clearTimeout(debounce);
+      unsubscribe();
+    };
   }, []);
 
   // Wraps the raw setter so every existing setItems((prev) => next) call

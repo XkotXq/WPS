@@ -31,6 +31,7 @@
     "ordersTransportList": "Lista transportów",
     "ordersTransportGuidelines": "Wytyczne do transportów",
     "ordersTransportHistory": "Historia transportów",
+    "ordersTransportLoginHistory": "Historia logowania",
     "ordersMaterials": "Zamówienia",
     "ordersMaterialsSearch": "Wyszukiwarka zamówień",
     "ordersWms": "Wydania WMS",
@@ -275,10 +276,25 @@
   },
   "ordersTransport": {
     "title": "Lista transportów",
-    "subtitle": "Transporty zlecone do magazynu głównego. Dane demonstracyjne - integracja z CIP jest w przygotowaniu.",
+    "subtitle": "Transporty zlecone do magazynu głównego.",
     "count": "Pozycji: {count}",
     "emptyStatus": "Brak transportów spełniających kryteria wyszukiwania.",
     "newOrder": "Nowy transport",
+    "loading": "Wczytywanie...",
+    "loadError": "Nie udało się pobrać listy transportów.",
+    "actions": {
+      "take": "Weź",
+      "complete": "Zrealizuj",
+      "cancel": "Anuluj",
+      "cancelReasonPrompt": "Powód anulowania (opcjonalnie):",
+      "accept": "Zgadza się",
+      "reportProblem": "Zgłoś problem",
+      "resolveProblem": "Problem rozwiązany",
+      "problemNotePrompt": "Na czym polega problem? (wózkowy to poprawi)",
+      "problemWithVendor": "Czeka na wózkowego"
+    },
+    "itemIssued": "Wydano: {value}",
+    "itemBatch": "Partia: {value}",
     "types": {
       "water_refill": "Dolewanie wody",
       "material_order": "Zamówienie materiału",
@@ -289,11 +305,14 @@
     },
     "details": {
       "water": "Rodzaj wody",
-      "clean": "Czysta",
-      "dirty": "Brudna",
+      "clean": "Czysta woda",
+      "dirty": "Mauzer na brudną wodę",
       "productionOrderNo": "Numer zamówienia"
     },
-    "viewMode": { "table": "Tabela", "cards": "Karty" },
+    "viewMode": {
+      "table": "Tabela",
+      "cards": "Karty"
+    },
     "columns": {
       "orderNo": "Numer transportu",
       "type": "Typ",
@@ -302,13 +321,16 @@
       "employeeNo": "Zlecający",
       "fulfilledBy": "Zrealizował",
       "createdAt": "Data utworzenia",
-      "note": "Dodatkowe informacje"
+      "note": "Dodatkowe informacje",
+      "actions": "Akcje"
     },
     "status": {
       "new": "Nowe",
       "inProgress": "W realizacji",
+      "delivered": "Dostarczone",
       "done": "Zrealizowane",
-      "cancelled": "Anulowane"
+      "cancelled": "Anulowane",
+      "problem": "Problem"
     },
     "newOrderPanel": {
       "titleFor": "Nowy transport: {type}",
@@ -340,6 +362,18 @@
       "removeRow": "Usuń pozycję",
       "cancel": "Anuluj",
       "save": "Zleć transport"
+    },
+    "photoOpenOriginal": "Otwórz oryginał",
+    "timeline": {
+      "title": "Przebieg",
+      "created": "Złożono zamówienie",
+      "taken": "Przyjęto do realizacji",
+      "resumed": "Problem rozwiązany - realizacja wznowiona",
+      "problem": "Zgłoszono problem",
+      "delivered": "Dostarczono",
+      "done": "Potwierdzono odbiór",
+      "doneAuto": "Potwierdzono automatycznie (brak reakcji)",
+      "cancelled": "Anulowano"
     }
   },
   "ordersTransportGuidelines": {
@@ -347,7 +381,7 @@
     "subtitle": "Ustaw, co wózkowy ma wiedzieć przy dostawie danego materiału na daną linię - np. \"krótkie odcinki\" dla 600tex na SH02.",
     "lineLabel": "Linia",
     "linesSelected": "(wybrano: {count})",
-    "materialLabel": "Materiał",
+    "materialLabel": "Materiał (opcjonalnie)",
     "materialPlaceholder": "Szukaj po numerze lub nazwie...",
     "noMatches": "Brak wyników",
     "noteLabel": "Wytyczna",
@@ -364,10 +398,25 @@
     "empty": "Brak wytycznych - dodaj pierwszą powyżej.",
     "saveError": "Nie udało się zapisać wytycznej.",
     "removeError": "Nie udało się usunąć wytycznej.",
-    "loadError": "Nie udało się pobrać wytycznych."
+    "loadError": "Nie udało się pobrać wytycznych.",
+    "allMaterials": "Wszystkie materiały"
   },
   "ordersTransportHistory": {
     "title": "Historia transportów"
+  },
+  "ordersTransportLoginHistory": {
+    "title": "Historia logowania",
+    "subtitle": "Kto i na którym wózku się zalogował - widoczne tylko dla logowań z PDA (smpda), które mają ustawione oznaczenie wózka.",
+    "count": "Pozycji: {count}",
+    "loading": "Wczytywanie...",
+    "loadError": "Nie udało się pobrać historii logowania.",
+    "retry": "Spróbuj ponownie",
+    "empty": "Brak zdarzeń logowania.",
+    "columns": {
+      "employeeNo": "Pracownik",
+      "deviceLabel": "Wózek",
+      "loggedInAt": "Data logowania"
+    }
   },
   "ordersTransportReports": {
     "title": "Raporty",
