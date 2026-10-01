@@ -264,6 +264,10 @@ person does what matters when changing any of it:
     2026-10-01): rejecting a delivery does not end the transport, it undoes
     the delivery and hands it back to the forklift operator to put right.
     A description is required.
+  - **"Anuluj" is offered only on a `new` order.** Once somebody has taken
+    it, the way out is the problem loop; wpsApi refuses to cancel a started
+    order whoever asks. This is also the only app with an "Anuluj" at all -
+    the phone apps have none.
   - a `problem` row stays on the active list and shows the reporter's own
     description in red, in both the table and the cards. The
     **"Problem rozwiązany"** button (`POST /orders/:id/problem/resolve`)
