@@ -40,7 +40,12 @@
     "searchPlaceholder": "Search...",
     "collapse": "Collapse navigation",
     "expand": "Expand navigation",
-    "closeTab": "Close tab"
+    "closeTab": "Close tab",
+    "openNav": "Open navigation",
+    "closeNav": "Close navigation",
+    "searchEmpty": "No page with that name.",
+    "permissions": "Permissions",
+    "ordersTransportShortLengths": "Short lengths"
   },
   "dashboard": {
     "welcomeTitle": "Welcome back",
@@ -224,7 +229,8 @@
     "compareFrom": "From",
     "compareTo": "To",
     "clickItemHint": "Click a row to see that item's trend",
-    "itemTrendTitle": "{item} - recent stocks"
+    "itemTrendTitle": "{item} - recent stocks",
+    "frpTrendTitle": "FRP trend"
   },
   "stockFrpDatabase": {
     "title": "FRP Database",
@@ -290,7 +296,7 @@
       "accept": "Confirm",
       "reportProblem": "Report a problem",
       "resolveProblem": "Problem solved",
-      "problemNotePrompt": "What is wrong? (the forklift operator will put it right)",
+      "problemNotePrompt": "What is wrong?",
       "problemWithVendor": "With the forklift operator"
     },
     "itemIssued": "Issued: {value}",
@@ -301,7 +307,8 @@
       "spool_order": "Spool order",
       "goods_transport": "Semi-finished goods transport",
       "waste_removal": "Waste removal",
-      "warehouse_return": "Return to warehouse"
+      "warehouse_return": "Return to warehouse",
+      "machine_transport": "Machine transport"
     },
     "details": {
       "water": "Water type",
@@ -361,7 +368,8 @@
       "noMatches": "No matches",
       "removeRow": "Remove row",
       "cancel": "Cancel",
-      "save": "Place transport"
+      "save": "Place transport",
+      "orderSpoolsLabel": "Spools on order {orderNo}"
     },
     "photoOpenOriginal": "Open the original",
     "timeline": {
@@ -378,7 +386,6 @@
   },
   "ordersTransportGuidelines": {
     "title": "Transport guidelines",
-    "subtitle": "Set what the forklift operator should know when delivering a given material to a given line - e.g. \"short lengths\" for 600tex on SH02.",
     "lineLabel": "Line",
     "linesSelected": "(selected: {count})",
     "materialLabel": "Material (optional)",
@@ -391,7 +398,8 @@
     "columns": {
       "line": "Line",
       "material": "Material",
-      "note": "Guideline"
+      "note": "Guideline",
+      "type": "Type"
     },
     "edit": "Edit",
     "remove": "Remove",
@@ -399,14 +407,18 @@
     "saveError": "Failed to save the guideline.",
     "removeError": "Failed to remove the guideline.",
     "loadError": "Failed to fetch the guidelines.",
-    "allMaterials": "All materials"
+    "allMaterials": "All materials",
+    "materialsSelected": "({count} selected)",
+    "materialRemove": "Remove material",
+    "typeLabel": "Transport type",
+    "anyType": "Any type",
+    "allLines": "All lines"
   },
   "ordersTransportHistory": {
     "title": "Transport history"
   },
   "ordersTransportLoginHistory": {
     "title": "Login history",
-    "subtitle": "Who logged in and on which forklift - only shown for PDA (smpda) logins that have a forklift label set.",
     "count": "Items: {count}",
     "loading": "Loading...",
     "loadError": "Failed to load the login history.",
@@ -420,7 +432,29 @@
   },
   "ordersTransportReports": {
     "title": "Reports",
-    "subtitle": "Transport reports will be shown here. This section is coming soon."
+    "loading": "Loading...",
+    "loadError": "Could not load the report.",
+    "retry": "Try again",
+    "deliveredTotal": "{count} delivered",
+    "range": {
+      "today": "Today",
+      "week": "7 days",
+      "month": "30 days"
+    },
+    "shiftsHeading": "Shifts",
+    "colShift": "Shift",
+    "colDelivered": "Delivered",
+    "colShare": "Share",
+    "colSplit": "Split by operator",
+    "colReaction": "Reaction",
+    "colHaul": "Haul",
+    "colConfirm": "Confirmation",
+    "colProblems": "Problems",
+    "colCancelled": "Cancelled",
+    "awaitingAccept": "+{count} to confirm",
+    "operatorsHeading": "Operators",
+    "typesHeading": "Task types",
+    "placesHeading": "Places"
   },
   "ordersMaterials": {
     "title": "Orders",
@@ -583,7 +617,6 @@
   },
   "materialsHistorySm": {
     "title": "SM Operation History",
-    "subtitle": "Receipts and issues recorded in SM Materials.",
     "loading": "Loading…",
     "fetchError": "Failed to fetch the history from the API.",
     "count": "Items: {count}",
@@ -707,5 +740,42 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System"
+  },
+  "employeeRoles": {
+    "title": "Permissions",
+    "loading": "Loading...",
+    "loadError": "Could not load the list.",
+    "saveError": "Could not save.",
+    "retry": "Try again",
+    "empty": "Nobody has logged in yet.",
+    "count": "{count} people",
+    "addLabel": "Add an employee number",
+    "add": "Add",
+    "colEmployee": "Employee number",
+    "colRole": "Role",
+    "colNote": "Note",
+    "colLogins": "Logins",
+    "colLastLogin": "Last login",
+    "roleNone": "No role",
+    "role": {
+      "supervisor": "Supervisor",
+      "orderer": "Orderer",
+      "forklift": "Forklift operator",
+      "warehouse": "Warehouse operator"
+    }
+  },
+  "shortLengths": {
+    "title": "Short lengths",
+    "loading": "Loading...",
+    "loadError": "Could not load the reports.",
+    "retry": "Try again",
+    "empty": "No reports.",
+    "count": "{count} reports",
+    "colTime": "Reported",
+    "colOrder": "Order",
+    "colEmployee": "Employee number",
+    "colItem": "Material",
+    "colQuantity": "Quantity",
+    "colPhoto": "Photo"
   }
 }

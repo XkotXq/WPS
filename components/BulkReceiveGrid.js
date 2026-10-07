@@ -5,6 +5,7 @@ import { DataEditor, CompactSelection } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { Trash2 } from "lucide-react";
 import { sanitizeQuantityInput } from "@/lib/quantityInput";
+import { installInsecureClipboardFallback } from "@/lib/insecureClipboard";
 import {
   makeTextCell,
   smTextCellRenderer,
@@ -31,6 +32,11 @@ const COLUMN_FIELDS = ["itemNo", "itemName", "quantity", "location"];
 // only ever gives item + summed quantity. Individual spool numbers get
 // assigned later, per item, once the physical spools are labeled - see
 // AssignSpoolNumbersPanel.
+// Over plain HTTP (the warehouse LAN) glide-data-grid's paste throws before
+// it reaches its own event-based fallback - see the module for what this
+// restores and why it is safe.
+installInsecureClipboardFallback();
+
 let bulkRowSeq = 0;
 export function newBulkReceiveRow() {
   bulkRowSeq += 1;

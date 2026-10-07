@@ -240,6 +240,41 @@ Known gotchas worth knowing before editing:
 
 <!-- BEGIN:nextjs-agent-rules -->
 
+## The dashboard shell (`app/dashboard/layout.js`)
+- **The sidebar is a slide-over drawer below `md` (768px) and a column above
+  it** - phones get the drawer, tablets and desktops keep the panel with its
+  collapse-to-icons toggle. The drawer closes on navigation, on Escape, on
+  the backdrop and on its own X; the collapse toggle is hidden there,
+  because there is nothing to collapse to.
+  - `iconsOnly = collapsed && !isPhone`, with the phone detected by
+    `matchMedia("(max-width: 767px)")`. It has to be a JS flag and not a
+    CSS variant: `collapsed` is persisted state, so somebody who collapsed
+    the sidebar on a desktop was getting an icons-only **drawer** on their
+    phone.
+  - The shell is `h-dvh`, not `h-screen`: on a phone `h-screen` is the
+    largest viewport height, so the bottom of the layout hid behind the
+    browser's own bar.
+- **The sidebar search searches page titles** against `PAGE_REGISTRY` (the
+  real page list, so it cannot drift from the nav), accent- and
+  case-insensitively (`foldForSearch` - "zamowien" finds "zamówień") and
+  against the group name too, so "transporty" lists everything under it.
+  Results show the group on the right, because "Raporty" exists under both
+  Stan magazynowy and Transporty.
+- **Every suggestion dropdown takes the arrow keys**, through the shared
+  `lib/useListKeyboard.js`: down/up move the highlight (no wrap-around),
+  Enter picks it - or the first option when none is highlighted, so
+  type-then-Enter works - and Escape closes. Used by the nav search, the
+  place inputs (`LocationInput`), the guidelines material picker and the
+  new-order item picker, whose two groups ("on this order" / everything
+  else) are walked as one flat sequence. Add new dropdowns through that
+  hook rather than re-implementing the index; some of these had no keyboard
+  handling at all and could only be used with a mouse.
+  - Attach `registerRow` to each option (`ref={(el) => keys.registerRow(i, el)}`):
+    these lists are capped at `max-h-56` and scroll, so without it arrowing
+    past the bottom moved an invisible highlight. `scrollIntoView({ block:
+    "nearest" })` scrolls the least that works, so moving inside the visible
+    part never jumps the view and the page behind the dropdown is untouched.
+
 ## Zamówienia (orders) - current state
 **Real, backed by wpsApi** (`lib/ordersApi.js` -> its `orders`/`order_items`
 tables; no longer the `lib/ordersCipSeed.js` demo). "Lista zamówień" is

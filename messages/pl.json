@@ -40,7 +40,12 @@
     "searchPlaceholder": "Szukaj...",
     "collapse": "Zwiń nawigację",
     "expand": "Rozwiń nawigację",
-    "closeTab": "Zamknij kartę"
+    "closeTab": "Zamknij kartę",
+    "openNav": "Otwórz nawigację",
+    "closeNav": "Zamknij nawigację",
+    "searchEmpty": "Brak podstrony o takiej nazwie.",
+    "permissions": "Uprawnienia",
+    "ordersTransportShortLengths": "Krótkie odcinki"
   },
   "dashboard": {
     "welcomeTitle": "Witaj ponownie",
@@ -224,7 +229,8 @@
     "compareFrom": "Od",
     "compareTo": "Do",
     "clickItemHint": "Kliknij wiersz, aby zobaczyć trend itemu",
-    "itemTrendTitle": "{item} - ostatnie stocki"
+    "itemTrendTitle": "{item} - ostatnie stocki",
+    "frpTrendTitle": "Trend FRP"
   },
   "stockFrpDatabase": {
     "title": "Baza FRP",
@@ -290,7 +296,7 @@
       "accept": "Zgadza się",
       "reportProblem": "Zgłoś problem",
       "resolveProblem": "Problem rozwiązany",
-      "problemNotePrompt": "Na czym polega problem? (wózkowy to poprawi)",
+      "problemNotePrompt": "Na czym polega problem?",
       "problemWithVendor": "Czeka na wózkowego"
     },
     "itemIssued": "Wydano: {value}",
@@ -301,7 +307,8 @@
       "spool_order": "Zamówienie szpul",
       "goods_transport": "Transport półproduktów",
       "waste_removal": "Wywożenie odpadu",
-      "warehouse_return": "Zwrot na magazyn"
+      "warehouse_return": "Zwrot na magazyn",
+      "machine_transport": "Przewóz maszyny"
     },
     "details": {
       "water": "Rodzaj wody",
@@ -361,7 +368,8 @@
       "noMatches": "Brak wyników",
       "removeRow": "Usuń pozycję",
       "cancel": "Anuluj",
-      "save": "Zleć transport"
+      "save": "Zleć transport",
+      "orderSpoolsLabel": "Szpule z zamówienia {orderNo}"
     },
     "photoOpenOriginal": "Otwórz oryginał",
     "timeline": {
@@ -378,7 +386,6 @@
   },
   "ordersTransportGuidelines": {
     "title": "Wytyczne do transportów",
-    "subtitle": "Ustaw, co wózkowy ma wiedzieć przy dostawie danego materiału na daną linię - np. \"krótkie odcinki\" dla 600tex na SH02.",
     "lineLabel": "Linia",
     "linesSelected": "(wybrano: {count})",
     "materialLabel": "Materiał (opcjonalnie)",
@@ -391,7 +398,8 @@
     "columns": {
       "line": "Linia",
       "material": "Materiał",
-      "note": "Wytyczna"
+      "note": "Wytyczna",
+      "type": "Rodzaj"
     },
     "edit": "Edytuj",
     "remove": "Usuń",
@@ -399,14 +407,18 @@
     "saveError": "Nie udało się zapisać wytycznej.",
     "removeError": "Nie udało się usunąć wytycznej.",
     "loadError": "Nie udało się pobrać wytycznych.",
-    "allMaterials": "Wszystkie materiały"
+    "allMaterials": "Wszystkie materiały",
+    "materialsSelected": "(wybrano: {count})",
+    "materialRemove": "Usuń materiał",
+    "typeLabel": "Rodzaj transportu",
+    "anyType": "Każdy rodzaj",
+    "allLines": "Wszystkie linie"
   },
   "ordersTransportHistory": {
     "title": "Historia transportów"
   },
   "ordersTransportLoginHistory": {
     "title": "Historia logowania",
-    "subtitle": "Kto i na którym wózku się zalogował - widoczne tylko dla logowań z PDA (smpda), które mają ustawione oznaczenie wózka.",
     "count": "Pozycji: {count}",
     "loading": "Wczytywanie...",
     "loadError": "Nie udało się pobrać historii logowania.",
@@ -420,7 +432,29 @@
   },
   "ordersTransportReports": {
     "title": "Raporty",
-    "subtitle": "Tutaj pojawią się raporty dotyczące transportów. Ta sekcja jest w przygotowaniu."
+    "loading": "Wczytywanie...",
+    "loadError": "Nie udało się pobrać raportu.",
+    "retry": "Spróbuj ponownie",
+    "deliveredTotal": "{count} dostarczonych",
+    "range": {
+      "today": "Dziś",
+      "week": "7 dni",
+      "month": "30 dni"
+    },
+    "shiftsHeading": "Zmiany",
+    "colShift": "Zmiana",
+    "colDelivered": "Dostarczone",
+    "colShare": "Udział",
+    "colSplit": "Podział na wózkowych",
+    "colReaction": "Reakcja",
+    "colHaul": "Jazda",
+    "colConfirm": "Potwierdzenie",
+    "colProblems": "Problemy",
+    "colCancelled": "Anulowane",
+    "awaitingAccept": "+{count} do potwierdzenia",
+    "operatorsHeading": "Wózkowi",
+    "typesHeading": "Typy zadań",
+    "placesHeading": "Miejsca"
   },
   "ordersMaterials": {
     "title": "Zamówienia",
@@ -583,7 +617,6 @@
   },
   "materialsHistorySm": {
     "title": "Historia operacji SM",
-    "subtitle": "Przyjęcia i wydania zarejestrowane w Materiałach SM.",
     "loading": "Ładowanie…",
     "fetchError": "Nie udało się pobrać historii z API.",
     "count": "Pozycji: {count}",
@@ -707,5 +740,42 @@
     "light": "Jasny",
     "dark": "Ciemny",
     "system": "Systemowy"
+  },
+  "employeeRoles": {
+    "title": "Uprawnienia",
+    "loading": "Wczytywanie...",
+    "loadError": "Nie udało się pobrać listy.",
+    "saveError": "Nie udało się zapisać.",
+    "retry": "Spróbuj ponownie",
+    "empty": "Nikt się jeszcze nie logował.",
+    "count": "{count} osób",
+    "addLabel": "Dodaj numer pracownika",
+    "add": "Dodaj",
+    "colEmployee": "Numer pracownika",
+    "colRole": "Rola",
+    "colNote": "Uwagi",
+    "colLogins": "Logowań",
+    "colLastLogin": "Ostatnie logowanie",
+    "roleNone": "Bez roli",
+    "role": {
+      "supervisor": "Przełożony",
+      "orderer": "Zamawiający",
+      "forklift": "Wózkowy",
+      "warehouse": "Magazynier"
+    }
+  },
+  "shortLengths": {
+    "title": "Krótkie odcinki",
+    "loading": "Wczytywanie...",
+    "loadError": "Nie udało się pobrać zgłoszeń.",
+    "retry": "Spróbuj ponownie",
+    "empty": "Brak zgłoszeń.",
+    "count": "{count} zgłoszeń",
+    "colTime": "Zgłoszono",
+    "colOrder": "Zamówienie",
+    "colEmployee": "Numer pracownika",
+    "colItem": "Materiał",
+    "colQuantity": "Ilość",
+    "colPhoto": "Zdjęcie"
   }
 }

@@ -40,9 +40,28 @@ function DeltaCell({ value }) {
 // falls back to the generic "Poprzednio/Teraz" translation (via
 // MaterialsTable's columnLabel) only for the brief moment before the
 // effect below has picked default dates yet.
-function tableColumns(material, fromLabel, toLabel) {
+function tableColumns(material, fromLabel, toLabel, currentLabel) {
+  // FRP reads as a trend list: what the item is, and how much of it there is
+  // right now. The two-date comparison (and its delta) is still what
+  // coatedFrp/filler show - there the question really is "what changed
+  // between these two rounds" - but for FRP the current amount per item is
+  // the number people come here for, and the per-item history is one click
+  // away on the row itself (ItemTrendChart below).
+  if (material === "frp") {
+    return [
+      { key: "item", headerKey: "item", filterFn: "multiselect", sortable: true },
+      { key: "diameter", headerKey: "diameter", filterFn: "multiselect", sortable: true },
+      {
+        key: "currentKm",
+        headerKey: "currKm",
+        label: currentLabel,
+        filterFn: "inNumberRange",
+        sortable: true,
+        render: (r) => <span className="tabular-nums">{r.currentKm === null ? "-" : formatKm(r.currentKm)}</span>,
+      },
+    ];
+  }
   return [
-    ...(material === "frp" ? [{ key: "item", headerKey: "item", filterFn: "multiselect", sortable: true }] : []),
     { key: "diameter", headerKey: "diameter", filterFn: "multiselect", sortable: true },
     ...(material === "coatedFrp" ? [{ key: "xbz", headerKey: "xbz", filterFn: "includesString", sortable: true }] : []),
     ...(material === "filler" ? [{ key: "color", headerKey: "color", filterFn: "multiselect", sortable: true }] : []),
@@ -66,17 +85,32 @@ function tableColumns(material, fromLabel, toLabel) {
   ];
 }
 
-function toRow(material, item, fromKey, toKey) {
+function toRow(material, item, fromKey, toKey, currentKey) {
   const fromKm = fromKey ? item.byDateKm[fromKey] ?? 0 : null;
   const toKm = toKey ? item.byDateKm[toKey] ?? 0 : null;
   const base = { id: item.groupKey, fromKm, toKm, deltaKm: fromKey && toKey ? toKm - fromKm : null };
-  if (material === "frp") return { ...base, item: item.groupKey, diameter: item.groupSubLabel || item.groupLabel || "" };
+  if (material === "frp") {
+    return {
+      ...base,
+      item: item.groupKey,
+      diameter: item.groupSubLabel || item.groupLabel || "",
+      // The newest stock round, not a picked date: 0 rather than null for an
+      // item that round did not list, because "nothing left" is the honest
+      // reading of an item missing from the latest count - a dash would read
+      // as "unknown".
+      currentKm: currentKey ? item.byDateKm[currentKey] ?? 0 : null,
+    };
+  }
   if (material === "coatedFrp") return { ...base, diameter: item.groupLabel, xbz: item.groupSubLabel };
   return { ...base, diameter: item.groupLabel, color: item.groupSubLabel };
 }
 
 function itemDisplayName(material, item) {
-  if (material === "frp") return item.groupSubLabel || item.groupLabel || item.groupKey;
+  // FRP names the chart by the item number first, because that is now the
+  // first column of the table the row was clicked in - titling it with the
+  // diameter alone left you guessing which of several items of that
+  // diameter you had opened.
+  if (material === "frp") return [item.groupKey, item.groupSubLabel || item.groupLabel].filter(Boolean).join(" - ");
   return [item.groupLabel, item.groupSubLabel].filter(Boolean).join(" / ") || item.groupKey;
 }
 
@@ -100,12 +134,22 @@ export default function MaterialBreakdownSection({ title, material, items, dateC
 
   const selectedItem = useMemo(() => items.find((item) => item.groupKey === selectedKey) ?? null, [items, selectedKey]);
 
-  const canCompare = dateColumns.length >= 2;
+  // FRP shows one column - the newest round - so there is nothing to
+  // compare and no pickers to show.
+  const isTrendOnly = material === "frp";
+  const currentColumn = dateColumns[dateColumns.length - 1] ?? null;
+  const canCompare = !isTrendOnly && dateColumns.length >= 2;
   const availableDates = useMemo(() => dateColumns.map((col) => col.key), [dateColumns]);
   const fromLabel = dateColumns.find((col) => col.key === fromKey)?.label;
   const toLabel = dateColumns.find((col) => col.key === toKey)?.label;
-  const columns = useMemo(() => tableColumns(material, fromLabel, toLabel), [material, fromLabel, toLabel]);
-  const rows = useMemo(() => items.map((item) => toRow(material, item, fromKey, toKey)), [items, material, fromKey, toKey]);
+  const columns = useMemo(
+    () => tableColumns(material, fromLabel, toLabel, currentColumn?.label),
+    [material, fromLabel, toLabel, currentColumn?.label]
+  );
+  const rows = useMemo(
+    () => items.map((item) => toRow(material, item, fromKey, toKey, currentColumn?.key)),
+    [items, material, fromKey, toKey, currentColumn?.key]
+  );
 
   function toggleItem(groupKey) {
     setSelectedKey((prev) => (prev === groupKey ? null : groupKey));

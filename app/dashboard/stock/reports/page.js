@@ -166,7 +166,7 @@ export default async function StockReportsPage({ searchParams }) {
               series={drumCountSeries}
             />
             <MaterialBreakdownSection
-              title={t("breakdownTitle", { material: tTabs(material) })}
+              title={material === "frp" ? t("frpTrendTitle") : t("breakdownTitle", { material: tTabs(material) })}
               material={material}
               items={trend.items}
               dateColumns={trend.dateColumns}

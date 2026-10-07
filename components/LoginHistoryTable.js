@@ -16,10 +16,13 @@ function formatDateTime(value) {
 const HEAD_CLS = "sticky top-0 z-10 bg-gray-50 text-[11px] font-medium tracking-wide text-gray-400 dark:bg-neutral-800 dark:text-neutral-500";
 const CELL_CLS = "text-gray-600 dark:text-neutral-300";
 
-// "Historia logowania" - which forklift ("wózek") an operator logged in
-// on, and when - see wpsapi's login_events/loginEventsApi.js. Flat,
-// read-only list (nothing to expand/edit) - only smpda logins ever appear
-// here, since a wps/stock browser login never sends a deviceLabel.
+// "Historia logowania" - who logged in and when, from any of the apps -
+// see wpsapi's login_events/loginEventsApi.js. Flat, read-only list
+// (nothing to expand/edit).
+//
+// It used to have a "Wózek" column too, from a per-device label set in
+// smVendor, and only labelled logins were recorded at all. The label was
+// dropped on 2026-10-02; every login is logged now.
 export default function LoginHistoryTable() {
   const t = useTranslations("ordersTransportLoginHistory");
   const [search, setSearch] = useState("");
@@ -41,7 +44,7 @@ export default function LoginHistoryTable() {
 
   const needle = search.trim().toLowerCase();
   const rows = needle
-    ? events.filter((e) => [e.employeeNo, e.deviceLabel].some((field) => field?.toLowerCase().includes(needle)))
+    ? events.filter((e) => [e.employeeNo].some((field) => field?.toLowerCase().includes(needle)))
     : events;
 
   return (
@@ -68,7 +71,6 @@ export default function LoginHistoryTable() {
               <TableHeader>
                 <TableRow className="border-b border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-800">
                   <TableHead className={`pl-4 ${HEAD_CLS}`}>{t("columns.employeeNo")}</TableHead>
-                  <TableHead className={HEAD_CLS}>{t("columns.deviceLabel")}</TableHead>
                   <TableHead className={`pr-4 ${HEAD_CLS}`}>{t("columns.loggedInAt")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -83,7 +85,6 @@ export default function LoginHistoryTable() {
                 {rows.map((event) => (
                   <TableRow key={event.id}>
                     <TableCell className={`pl-4 font-medium ${CELL_CLS}`}>{event.employeeNo}</TableCell>
-                    <TableCell className={CELL_CLS}>{event.deviceLabel}</TableCell>
                     <TableCell className={`pr-4 ${CELL_CLS}`}>{formatDateTime(event.loggedInAt)}</TableCell>
                   </TableRow>
                 ))}

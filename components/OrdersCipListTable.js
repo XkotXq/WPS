@@ -1,13 +1,14 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ChevronDown, ChevronRight, Droplets, ImagePlus, LayoutGrid, Package, Plus, Spool, Table2, Trash2, Truck, Undo2, X } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { ArrowRight, ChevronDown, ChevronRight, Droplets, Forklift, ImagePlus, LayoutGrid, Package, Plus, Spool, Table2, Trash2, Truck, Undo2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import FrpFilters from "@/components/FrpFilters";
+import { useListKeyboard, listRowClasses } from "@/lib/useListKeyboard";
 import { ordersApi } from "@/lib/ordersApi";
 import { smCatalogApi } from "@/lib/smCatalogApi";
 import { lineMaterialRulesApi } from "@/lib/lineMaterialRulesApi";
@@ -20,13 +21,19 @@ import { sanitizeQuantityInput } from "@/lib/quantityInput";
 // Used as a fallback before ordersApi.locations() resolves (see
 // `locationPool`'s own initial state) and as the fixed picker for every
 // order type but the free-text goods_transport.
+// Spelled out since 2026-10-06: the series stopped being regular ranges.
+// Kept in step with wpsApi's own seed (schema.sql) and smOrder's
+// line_codes.dart by hand - three copies of one list, which is why adding a
+// line means touching all three. Reading them from GET
+// /line-material-rules/lines instead is the obvious next step.
 const LINE_CODES = [
-  ...Array.from({ length: 7 }, (_, i) => `SH0${i + 1}`),
-  ...Array.from({ length: 13 }, (_, i) => `ST${String(i + 1).padStart(2, "0")}`),
-  "FC01",
-  "FC02",
-  "FC03",
-  "FL01",
+  "SH01", "SH02", "SH03", "SH04", "SH05", "SH06", "SH07", "SH08",
+  "SH09", "SH10", "SH11", "SH12", "SH13", "FC01", "FC02", "FC03",
+  "FC04", "FC05", "FC06", "FC07", "FC08", "FL01", "WS01", "SC01",
+  "SC02", "SC03", "SC04", "SC05", "SC06", "SC07", "SC08", "TF01",
+  "TF02", "TF03", "SU01", "SU02", "SU03", "SU04", "SU05", "SU06",
+  "SU07", "SU08", "ST01", "ST02", "ST03", "ST04", "ST05", "ST06",
+  "ST07",
 ];
 
 // What each type of order asks for - the "Nowe zamówienie" menu lists these in
@@ -45,18 +52,45 @@ const LINE_CODES = [
 // would otherwise wipe it out on hover.
 const ORDER_TYPES = [
   { code: "water_refill", fields: ["to", "water"], icon: Droplets, iconTone: "text-blue-600! dark:text-blue-400!" },
-  { code: "material_order", fields: ["to", "productionOrderNo", "items"], icon: Package, iconTone: "text-pink-600! dark:text-pink-400!" },
-  { code: "spool_order", fields: ["to", "items"], icon: Spool, iconTone: "text-gray-600! dark:text-neutral-300!" },
+  {
+    code: "material_order",
+    fields: ["to", "productionOrderNo", "items"],
+    productionOrderNoRequired: true,
+    icon: Package,
+    iconTone: "text-pink-600! dark:text-pink-400!",
+  },
+  // The production order number finds the drum(s) that order's cable ships
+  // on. Unlike material_order it is **not required** (see
+  // productionOrderNoRequired): it only scopes the picker, and a spool can
+  // still be named from the catalog as this type always allowed.
+  {
+    code: "spool_order",
+    fields: ["to", "productionOrderNo", "items"],
+    icon: Spool,
+    iconTone: "text-gray-600! dark:text-neutral-300!",
+  },
   { code: "goods_transport", fields: ["from", "to", "photo"], freeText: true, icon: Truck, iconTone: "text-orange-600! dark:text-orange-400!" },
   { code: "waste_removal", fields: ["from", "photo"], icon: Trash2, iconTone: "text-yellow-600! dark:text-yellow-400!" },
   { code: "warehouse_return", fields: ["from", "photo"], icon: Undo2, iconTone: "text-green-600! dark:text-green-400!" },
+  // Free text like goods_transport: a machine goes to a workshop, a hall or
+  // a gate as readily as to a line. The server decides which types may do
+  // that (schema.sql's orders_before_insert) - this flag only has to agree
+  // with it, or the form would offer a text box for places the insert then
+  // rejects.
+  {
+    code: "machine_transport",
+    fields: ["from", "to", "photo"],
+    freeText: true,
+    icon: Forklift,
+    iconTone: "text-gray-600! dark:text-neutral-300!",
+  },
 ];
 
 // `freeText`: "skąd"/"dokąd" are not limited to the production lines - they
 // suggest every place known so far (the fixed lines plus any typed on an earlier
 // order) and accept a new one, which then joins the suggestions.
 // The "from" line is asked differently per type.
-const FROM_LABEL_KEY = { goods_transport: "from", waste_removal: "place", warehouse_return: "collectFrom" };
+const FROM_LABEL_KEY = { goods_transport: "from", machine_transport: "from", waste_removal: "place", warehouse_return: "collectFrom" };
 
 const FIELD_CLS =
   "h-10 w-full rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm text-gray-900 dark:text-neutral-100 focus:border-navy-700 dark:focus:border-navy-400 focus:outline-none focus:ring-1 focus:ring-navy-700 dark:focus:ring-navy-400";
@@ -138,9 +172,12 @@ function routeLabel(order) {
 // Whether anything's actually been issued against this item yet - FRP
 // checks its own per-drum entries (issuedQuantity there is just a count,
 // see wpsApi's order_items_progress), everything else the plain sum.
+// Anything issued at all against this line - which is also what counts as
+// "done" since 2026-10-02 (see wpsapi's order_items_progress.issue_count:
+// the old issued >= ordered compared a piece count with a weight).
 function hasIssued(item) {
   if (item.category === "FRP") return Boolean(item.issuedEntries?.length);
-  return Number(item.issuedQuantity ?? 0) > 0;
+  return Number(item.issueCount ?? 0) > 0;
 }
 
 // "48.400" -> "48.4", "50.000" -> "50" - a quantity shown on screen without
@@ -204,6 +241,16 @@ function LocationInput({ label, value, onChange, locations, t, restrictToList = 
     () => locations.filter((name) => !needle || name.toLowerCase().includes(needle)).slice(0, 8),
     [locations, needle]
   );
+  const pick = useCallback(
+    (i) => {
+      const name = matches[i];
+      if (!name) return;
+      onChange(name);
+      setOpen(false);
+    },
+    [matches, onChange]
+  );
+  const keys = useListKeyboard({ length: matches.length, onPick: pick, onEscape: () => setOpen(false) });
   const isKnown = locations.some((name) => name.toLowerCase() === needle);
   const showInvalidHint = restrictToList && needle !== "" && !isKnown;
 
@@ -223,19 +270,21 @@ function LocationInput({ label, value, onChange, locations, t, restrictToList = 
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={keys.onKeyDown}
       />
       {open && needle !== "" && matches.length > 0 && (
         <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-          {matches.map((name) => (
+          {matches.map((name, i) => (
             <button
               key={name}
+              ref={(el) => keys.registerRow(i, el)}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onChange(name);
-                setOpen(false);
-              }}
-              className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-50 dark:text-neutral-100 dark:hover:bg-neutral-800"
+              onClick={() => pick(i)}
+              onMouseEnter={() => keys.setIndex(i)}
+              className={`flex w-full items-center px-3 py-2 text-left text-sm text-gray-900 dark:text-neutral-100 ${listRowClasses(
+                i === keys.index
+              )}`}
             >
               {name}
             </button>
@@ -280,6 +329,13 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
   const has = (field) => config.fields.includes(field);
   const open = Boolean(type);
   const isMaterialOrder = config.code === "material_order";
+  const isSpoolOrder = config.code === "spool_order";
+  // Both types are scoped by a production order; they want opposite halves
+  // of what CIP returns for it. A drum is not a material the line is asking
+  // to be brought as stock, and a material is not a spool to wind onto -
+  // wpsApi flags the drums as `isDrumRequirement` (see its AGENTS.md,
+  // "Drum/spool size").
+  const scopedByOrder = isMaterialOrder || isSpoolOrder;
   const [form, setForm] = useState(EMPTY_FORM);
   const [catalog, setCatalog] = useState([]);
   // "Wytyczne do transportów" (line_material_rules, managed on its own wps
@@ -420,6 +476,13 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
               // field the "Zamówienia" search tab already shows next to an
               // order's own orderId (see OrderMaterialsSearch.js).
               segment: line.segDescription ?? null,
+              // A drum/spool this order's cable ships on, rather than a
+              // material it is made of (wpsApi flags these - see its
+              // AGENTS.md, "Drum/spool size"). "Zamówienie szpul" offers
+              // exactly these and "Zamówienie materiału" the rest, so
+              // dropping the flag here - which this mapping did at first -
+              // silently showed each type the other's half.
+              isDrumRequirement: Boolean(m.isDrumRequirement),
             });
           }
         }
@@ -469,13 +532,22 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
   // typed needle against the full sm_catalog, same as before, and never has
   // an `orderMatches` group at all.
   const orderMatches = useMemo(() => {
-    if (!isMaterialOrder) return [];
+    if (!scopedByOrder) return [];
     const needle = itemSearch.trim().toLowerCase();
     return orderMaterials
+      // **Only "Zamówienie szpul" narrows this.** It exists to order the
+      // reel the cable ships on, so a BOM material would be noise there.
+      // "Zamówienie materiału" keeps the whole list, drums included, the
+      // way it always did: the drum is part of what that production order
+      // needs, and filtering it out (which this did between 2026-10-05 and
+      // 2026-10-06) took away a spool people were ordering from here - it
+      // stayed visible in "Wyszukaj zamówienia", which is how the two
+      // screens ended up disagreeing about the same order.
+      .filter((entry) => !isSpoolOrder || Boolean(entry.isDrumRequirement))
       .filter((entry) => !rows.some((row) => row.itemNo === entry.itemNo))
       .filter((entry) => !needle || entry.itemNo.toLowerCase().includes(needle) || entry.itemName.toLowerCase().includes(needle))
       .slice(0, 20);
-  }, [orderMaterials, isMaterialOrder, itemSearch, rows]);
+  }, [orderMaterials, scopedByOrder, isSpoolOrder, itemSearch, rows]);
 
   // The general catalog, shown below `orderMatches` - only once something's
   // typed (unlike `orderMatches`, this is never browsable empty-handed: the
@@ -490,6 +562,23 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
       .filter((entry) => entry.itemNo.toLowerCase().includes(needle) || entry.itemName.toLowerCase().includes(needle))
       .slice(0, 8);
   }, [catalog, itemSearch, rows, orderMatches]);
+
+  // Both groups walked as one top-to-bottom sequence - "on this order"
+  // first, then everything else, exactly as they are rendered.
+  const pickerFlat = scopedByOrder ? [...orderMatches, ...otherMatches] : otherMatches;
+  const pickItem = useCallback(
+    (i) => {
+      const entry = pickerFlat[i];
+      if (entry) addItem(entry);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pickerFlat]
+  );
+  const itemKeys = useListKeyboard({
+    length: pickerFlat.length,
+    onPick: pickItem,
+    onEscape: () => setPickerOpen(false),
+  });
 
   function addItem(entry) {
     // order_items are always counted by piece, never the material's own
@@ -532,7 +621,7 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
     (!has("from") || isValidPlace(form.from)) &&
     (!(has("from") && has("to")) || form.from.trim().toLowerCase() !== form.to.trim().toLowerCase()) &&
     (!has("water") || Boolean(form.water)) &&
-    (!has("productionOrderNo") || Boolean(form.productionOrderNo.trim())) &&
+    (!config.productionOrderNoRequired || Boolean(form.productionOrderNo.trim())) &&
     (!has("items") || validRows.length > 0);
 
   async function handleSubmit() {
@@ -594,7 +683,7 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
           1.5 = 48rem = max-w-3xl) - its own material picker (two labeled
           groups, see orderMatches/otherMatches above) needs more room than
           every other order type's plain form. */}
-      <DialogContent className={isMaterialOrder ? "max-w-3xl" : undefined}>
+      <DialogContent className={scopedByOrder ? "max-w-3xl" : undefined}>
         <DialogHeader>
           <DialogTitle>{t("newOrderPanel.titleFor", { type: t(`types.${config.code}`) })}</DialogTitle>
         </DialogHeader>
@@ -665,12 +754,12 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
                     setOrderMaterialsStatus("idle");
                   }
                 }}
-                onBlur={() => isMaterialOrder && fetchOrderMaterials()}
+                onBlur={() => scopedByOrder && fetchOrderMaterials()}
               />
-              {isMaterialOrder && orderMaterialsStatus === "loading" && (
+              {scopedByOrder && orderMaterialsStatus === "loading" && (
                 <span className="text-xs text-gray-400 dark:text-neutral-500">{t("newOrderPanel.orderMaterialsLoading")}</span>
               )}
-              {isMaterialOrder && orderMaterialsStatus === "error" && (
+              {scopedByOrder && orderMaterialsStatus === "error" && (
                 <span className="text-xs text-red-600 dark:text-red-400">{t("newOrderPanel.orderMaterialsError")}</span>
               )}
             </label>
@@ -685,41 +774,50 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
               <input
                 className={FIELD_CLS}
                 value={itemSearch}
-                disabled={isMaterialOrder && !form.productionOrderNo.trim()}
+                disabled={config.productionOrderNoRequired && !form.productionOrderNo.trim()}
                 onChange={(e) => {
                   setItemSearch(e.target.value);
                   setPickerOpen(true);
                 }}
                 onFocus={() => setPickerOpen(true)}
                 onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
+                onKeyDown={itemKeys.onKeyDown}
                 placeholder={
-                  isMaterialOrder && !form.productionOrderNo.trim()
+                  config.productionOrderNoRequired && !form.productionOrderNo.trim()
                     ? t("newOrderPanel.addItemPlaceholderNeedOrderNo")
                     : t("newOrderPanel.addItemPlaceholder")
                 }
               />
-              {pickerOpen && (itemSearch.trim() || isMaterialOrder) && !(isMaterialOrder && !form.productionOrderNo.trim()) && (
+              {pickerOpen &&
+                (itemSearch.trim() || (scopedByOrder && orderMatches.length > 0)) &&
+                !(config.productionOrderNoRequired && !form.productionOrderNo.trim()) && (
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-                  {isMaterialOrder && orderMaterialsStatus === "loading" ? (
+                  {scopedByOrder && orderMaterialsStatus === "loading" ? (
                     <p className="px-3 py-2 text-sm text-gray-400 dark:text-neutral-500">{t("newOrderPanel.orderMaterialsLoading")}</p>
-                  ) : isMaterialOrder && orderMaterialsStatus === "error" ? (
+                  ) : scopedByOrder && orderMaterialsStatus === "error" ? (
                     <p className="px-3 py-2 text-sm text-red-600 dark:text-red-400">{t("newOrderPanel.orderMaterialsError")}</p>
                   ) : orderMatches.length === 0 && otherMatches.length === 0 ? (
                     <p className="px-3 py-2 text-sm text-gray-400 dark:text-neutral-500">{t("newOrderPanel.noMatches")}</p>
                   ) : (
                     <>
-                      {isMaterialOrder && orderMatches.length > 0 && (
+                      {scopedByOrder && orderMatches.length > 0 && (
                         <>
                           <p className="truncate bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-700 dark:bg-navy-500/15 dark:text-navy-300">
-                            {t("newOrderPanel.orderMaterialsLabel", { orderNo: resolvedOrderLabel })}
+                            {t(isSpoolOrder ? "newOrderPanel.orderSpoolsLabel" : "newOrderPanel.orderMaterialsLabel", {
+                              orderNo: resolvedOrderLabel,
+                            })}
                           </p>
-                          {orderMatches.map((entry) => (
+                          {orderMatches.map((entry, i) => (
                             <button
                               key={entry.itemNo}
+                              ref={(el) => itemKeys.registerRow(i, el)}
                               type="button"
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => addItem(entry)}
-                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-neutral-800"
+                              onMouseEnter={() => itemKeys.setIndex(i)}
+                              className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${listRowClasses(
+                                i === itemKeys.index
+                              )}`}
                             >
                               <span className="truncate">
                                 <span className="font-medium text-gray-900 dark:text-neutral-100">{entry.itemName}</span>
@@ -731,18 +829,24 @@ function NewOrderPanel({ type, locations, onClose, onCreate, t }) {
                       )}
                       {otherMatches.length > 0 && (
                         <>
-                          {isMaterialOrder && (
+                          {scopedByOrder && (
                             <p className="truncate bg-gray-50 px-3 py-1 text-[11px] font-medium text-gray-400 dark:bg-neutral-800 dark:text-neutral-500">
                               {t("newOrderPanel.otherMaterialsLabel")}
                             </p>
                           )}
-                          {otherMatches.map((entry) => (
+                          {otherMatches.map((entry, i) => (
                             <button
                               key={entry.itemNo}
+                              ref={(el) => itemKeys.registerRow((scopedByOrder ? orderMatches.length : 0) + i, el)}
                               type="button"
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => addItem(entry)}
-                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-neutral-800"
+                              // Offset by the group above it, so the arrows
+                              // see one list.
+                              onMouseEnter={() => itemKeys.setIndex((scopedByOrder ? orderMatches.length : 0) + i)}
+                              className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${listRowClasses(
+                                (scopedByOrder ? orderMatches.length : 0) + i === itemKeys.index
+                              )}`}
                             >
                               <span className="truncate">
                                 <span className="font-medium text-gray-900 dark:text-neutral-100">{entry.itemName}</span>
@@ -983,25 +1087,44 @@ function eventLabel(event, previous, t) {
   }
 }
 
+// Collapsed by default - most of the time an order is opened to see what is
+// on it, not to audit it, and the log is the longest thing in the expanded
+// row. The heading still carries the number of steps, which is the part
+// worth seeing without opening anything: an ordinary transport has four,
+// so anything more says something happened.
 function OrderEventLog({ events, t }) {
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs font-semibold text-gray-500 dark:text-neutral-400">{t("timeline.title")}</span>
-      {events.map((event, i) => {
-        const bad = event.kind === "problem" || event.kind === "cancelled";
-        return (
-          <div key={`${event.at}-${event.kind}-${i}`} className="flex items-baseline gap-2 text-xs">
-            <span className="shrink-0 tabular-nums text-gray-400 dark:text-neutral-500">{formatDateTime(event.at)}</span>
-            <span className={bad ? "font-medium text-red-700 dark:text-red-400" : "font-medium text-gray-700 dark:text-neutral-200"}>
-              {eventLabel(event, events[i - 1], t)}
-            </span>
-            {event.actor && event.actor !== "auto" && (
-              <span className="text-gray-400 dark:text-neutral-500">{event.actor}</span>
-            )}
-            {event.note && <span className="text-gray-500 dark:text-neutral-400">{event.note}</span>}
-          </div>
-        );
-      })}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((prev) => !prev);
+        }}
+        className="flex w-fit items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+      >
+        {open ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+        {t("timeline.title")}
+        <span className="font-normal text-gray-400 dark:text-neutral-500">{events.length}</span>
+      </button>
+      {open &&
+        events.map((event, i) => {
+          const bad = event.kind === "problem" || event.kind === "cancelled";
+          return (
+            <div key={`${event.at}-${event.kind}-${i}`} className="flex items-baseline gap-2 text-xs">
+              <span className="shrink-0 tabular-nums text-gray-400 dark:text-neutral-500">{formatDateTime(event.at)}</span>
+              <span className={bad ? "font-medium text-red-700 dark:text-red-400" : "font-medium text-gray-700 dark:text-neutral-200"}>
+                {eventLabel(event, events[i - 1], t)}
+              </span>
+              {event.actor && event.actor !== "auto" && (
+                <span className="text-gray-400 dark:text-neutral-500">{event.actor}</span>
+              )}
+              {event.note && <span className="text-gray-500 dark:text-neutral-400">{event.note}</span>}
+            </div>
+          );
+        })}
     </div>
   );
 }
