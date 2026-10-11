@@ -202,6 +202,7 @@ export default function DashboardLayout({ children }) {
 
   const ordersMaterialsChildren = [
     { href: "/dashboard/orders/materials", label: tNav("ordersMaterialsSearch") },
+    { href: "/dashboard/orders/materials/production-progress", label: tNav("ordersMaterialsProductionProgress") },
   ];
 
   const ordersWmsChildren = [{ href: "/dashboard/orders/wms", label: tNav("ordersWmsLists") }];

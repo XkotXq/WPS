@@ -354,6 +354,118 @@ that actually attaches one.
 (six types, order numbers, shifts A/B/C, statuses, photos) is in
 `../wpsApi/AGENTS.md` ("Transport orders").
 
+## Zamówienia → Postęp produkcji
+`app/dashboard/orders/materials/production-progress/` +
+`components/ProductionProgressTable.js`: the planners' list of what runs on
+which production line is pasted in whole, and every position comes back with
+the length of its run and how much is still to be made. Read-only, live
+against CIP on every check, nothing stored.
+- **The list is filled in a grid** (`ProductionProgressGrid.js`), two
+  columns - line and number - so a shift's list goes in with one Ctrl+V out
+  of Excel. It is the cut-down sibling of `BulkReceiveGrid` ("Przyjęcie
+  zamówienia"): same glide-data-grid, same spare-row rule, same
+  `installInsecureClipboardFallback()` (paste throws over plain HTTP without
+  it) and the same two documented glide quirks (`editOnType` restarts the
+  edit session per keystroke; the default `activateCell` binding of " "
+  swallows spaces). No catalog lookups and no quantity sanitising here -
+  there is nothing numeric to clean.
+  - The number column takes **either** a job number or a bare order number;
+    nothing here validates which, the API decides.
+- **The paste is parsed by wpsApi, not here** (`POST
+  /cip-orders/progress` - see its own AGENTS.md section for the format, and
+  for why `layersFinishedLength` must never be read as "produced"). This
+  screen deliberately has no idea what the format is, so the two cannot
+  drift apart: the grid is serialised to the two-column tab-separated text
+  that parser already handles (`progressRowsToText`) rather than growing a
+  payload shape of its own.
+- `lib/productionProgressApi.js` is a **Server Action** for the same reason
+  `lib/cipOrdersApi.js` is one: the CIP bearer token lives in an httpOnly
+  cookie and must never reach a `"use client"` file. It carries the same
+  one-shot refresh-and-retry on `session_expired`.
+- Each position also shows **which materials it needs** - one column per
+  kind (FRP, PE), built from the API's own `materialKeys` exactly as the
+  stage columns are, so a kind nothing in the paste needs is not a column
+  and a new kind needs no change here (the header is the group's own code).
+  Each cell gives the whole run's required amount and - when the run is part
+  made - what is still to issue for the rest of it. Both numbers come from
+  the API; don't re-derive them here.
+  - **Each stage cell also carries the materials that stage consumes**
+    (FRP, then the PE/LSZH jacket), each with what is still to issue in its
+    own catalog unit - km for FRP, kg for a jacket compound. The amount is
+    scaled by **that stage's** progress, not the run's, so the same
+    material reads differently under SC and under SH. That is also why the
+    full view has no standalone material columns: they would say the same
+    thing twice with two different numbers. The plain view keeps them,
+    having no stage columns to put them in.
+  - The stage columns say **"nieskończone"** once in the header rather than
+    in every cell, and "km" is printed after a figure only where the API own
+    `inRunKm` says that stage really is counted in cable kilometres - SC is
+    not.
+  - Next to each order id sits **how many production lines that order runs
+    on** across the whole result (names on hover), picked out in colour as
+    soon as there is more than one: the same material then has to reach
+    several places. The id itself keeps CIP own bracketed line number
+    ("260010303024501(6)"); only a position CIP did not find falls back to
+    the bare number, which is all the paste carried.
+  - Which kind a material belongs to is decided **server-side**, and the two
+    kinds deliberately use different signals: FRP by catalog name, PE by
+    catalog category (see wpsApi's `MATERIAL_GROUPS` for why each one is the
+    only safe choice). Never re-derive either here from a name you see on
+    screen.
+- Above the table sits **what a day's run takes of each FRP and how many
+  rolls that is** - the API's `frpRolls`, broken down per line. The rule (a
+  line does 55 km a day, a roll holds 48.8 km, and parallel machines cannot
+  share a roll) lives server-side; don't recompute it here. Each line group
+  header also carries that line's own FRP total across its positions.
+- **Two views and per-column hiding, both off one column model**
+  (`columnsFor`): a column is `{ id, label, identity?, numeric?,
+  showsWhenMissing?, materialKey?, processKey? }`, and every row cell goes
+  through `PositionCell`'s switch on it. That indirection is the point -
+  hiding a column or swapping the view can never leave the header and the
+  rows disagreeing, which a fixed run of `<TableCell>`s could not promise.
+  - **Pełny**: grouped by line with per-line subtotals, every column.
+  - **Prosty**: grouped by line exactly as the full view is - the line
+    heads its own group, so it is not repeated in a column - carrying just
+    the order number and a single stage column holding **the stage that
+    line actually runs**
+    (the API's `lineProcess`: ST strands, SH and FC sheathe, SC is SC).
+    Same cell content as the full view, materials included, so an ST line
+    is never asked about sheathing and the other stages are not columns of
+    blanks. A line whose name says nothing about its stage shows a dash,
+    never another stage's figures. The group header summarises that one
+    stage, since every row under it is on the same line and so runs the
+    same one.
+    Its material rows also carry **consumption per kilometre of cable**
+    (the API's `perKm`) under the amount still needed - the figure you
+    multiply by to plan, as against what is left right now. Only this view
+    shows it; the full one is already dense with four stage columns.
+  - Hidden columns are a `Set` of ids in state, toggled from the same
+    `Columns3` + `DropdownMenuCheckboxItem` control `MaterialsTable` uses.
+    The last visible column cannot be switched off. The per-line header row
+    spans whichever `identity` columns are visible and summarises the rest,
+    so hiding one never knocks it out of alignment.
+- **One column per process stage, built from the API's own `processKeys`** -
+  never a hardcoded list of stages. CIP has fifteen and a cable normally
+  goes through about four, so the API sends only the ones something in the
+  result reports on and this screen renders exactly those; a stage that
+  stops being reported stops being a column on its own, with no change here.
+  Every `colSpan` is therefore computed (`3 + processKeys.length`), not a
+  literal.
+  - Each cell is **what is left of that stage and what it is out of**, in
+    that stage's own unit - so a stage column is read down its own length
+    and never across to another. Stranding is the case that makes this
+    matter: a 44 km run reports 264 there. The percentage (the bar, and the
+    cell's `title`) is the stage against its own planned amount.
+  - The run-level "Zostało/Zrobione/Postęp" columns were dropped when these
+    went in: SH's column carries exactly those numbers, and the summary
+    cards above the table still give the whole paste's kilometres.
+  - Per-line subtotals sum each stage down its own column, for the same
+    unit reason.
+- Grouped by line with per-line subtotals, in the pasted order, because the
+  question being asked is "what is left on ST03" and not "what is left on
+  position 544069". The percentages are recomputed from summed kilometres,
+  never averaged, so a 500 km run counts for more than a 10 km one.
+
 # This is NOT the Next.js you know
 
 This version has breaking changes - APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.

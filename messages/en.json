@@ -34,6 +34,7 @@
     "ordersTransportLoginHistory": "Login history",
     "ordersMaterials": "Orders",
     "ordersMaterialsSearch": "Order search",
+    "ordersMaterialsProductionProgress": "Production progress",
     "ordersWms": "WMS Issues",
     "ordersWmsLists": "Issue lists",
     "search": "Search",
@@ -777,5 +778,45 @@
     "colItem": "Material",
     "colQuantity": "Quantity",
     "colPhoto": "Photo"
+  },
+  "productionProgress": {
+    "title": "Production progress",
+    "addRow": "+ Add row",
+    "removeSelected": "Remove selected ({count})",
+    "grid": {
+      "line": "Line",
+      "number": "Order / job number"
+    },
+    "check": "Check",
+    "checking": "Checking...",
+    "clear": "Clear",
+    "viewFull": "Full",
+    "viewSimple": "Simple",
+    "columnsButton": "Columns",
+    "fetched": "{positions} positions from {orders} orders",
+    "positions": "{count} pos.",
+    "noLine": "No line",
+    "notFound": "Not found in CIP",
+    "finished": "Finished",
+    "unfinished": "unfinished",
+    "frpForDay": "FRP for today",
+    "rolls": "{count, plural, =1 {1 roll} other {# rolls}}",
+    "onLines": "{count, plural, =1 {1 line} other {# lines}}",
+    "noMaterial": "none",
+    "processOf": "of {total}",
+    "stillNeeded": "{quantity} left",
+    "error": "Could not load the progress.",
+    "summary": {
+      "total": "In total",
+      "remaining": "Remaining",
+      "produced": "Produced"
+    },
+    "columns": {
+      "position": "Position",
+      "cable": "Cable",
+      "orderNumber": "Order number",
+      "process": "Process",
+      "total": "Total (km)"
+    }
   }
 }

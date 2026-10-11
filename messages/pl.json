@@ -34,6 +34,7 @@
     "ordersTransportLoginHistory": "Historia logowania",
     "ordersMaterials": "Zamówienia",
     "ordersMaterialsSearch": "Wyszukiwarka zamówień",
+    "ordersMaterialsProductionProgress": "Postęp produkcji",
     "ordersWms": "Wydania WMS",
     "ordersWmsLists": "Listy wydań",
     "search": "Szukaj",
@@ -777,5 +778,45 @@
     "colItem": "Materiał",
     "colQuantity": "Ilość",
     "colPhoto": "Zdjęcie"
+  },
+  "productionProgress": {
+    "title": "Postęp produkcji",
+    "addRow": "+ Dodaj wiersz",
+    "removeSelected": "Usuń zaznaczone ({count})",
+    "grid": {
+      "line": "Linia",
+      "number": "Numer zamówienia / job"
+    },
+    "check": "Sprawdź",
+    "checking": "Sprawdzanie...",
+    "clear": "Wyczyść",
+    "viewFull": "Pełny",
+    "viewSimple": "Prosty",
+    "columnsButton": "Kolumny",
+    "fetched": "{positions} pozycji z {orders} zleceń",
+    "positions": "{count} poz.",
+    "noLine": "Bez linii",
+    "notFound": "Nie znaleziono w CIP",
+    "finished": "Zakończone",
+    "unfinished": "nieskończone",
+    "frpForDay": "FRP na dzisiejszą zmianę",
+    "rolls": "{count, plural, =1 {1 rolka} few {# rolki} many {# rolek} other {# rolek}}",
+    "onLines": "{count, plural, =1 {1 linia} few {# linie} many {# linii} other {# linii}}",
+    "noMaterial": "brak",
+    "processOf": "z {total}",
+    "stillNeeded": "jeszcze {quantity}",
+    "error": "Nie udało się pobrać postępu.",
+    "summary": {
+      "total": "W całości",
+      "remaining": "Zostało",
+      "produced": "Wyprodukowano"
+    },
+    "columns": {
+      "position": "Pozycja",
+      "cable": "Kabel",
+      "orderNumber": "Numer zamówienia",
+      "process": "Proces",
+      "total": "W całości (km)"
+    }
   }
 }
