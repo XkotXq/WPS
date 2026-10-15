@@ -55,6 +55,17 @@ export default function EmployeeRolesTable() {
     reload();
   }, []);
 
+  // What the select may offer: the roles the API hands out **plus any role
+  // somebody already has**. The list has been narrowed before (four roles
+  // went on 2026-10-15) and a role no longer offered would otherwise
+  // render as a select with no matching option - which reads as
+  // "bez roli" while the database says otherwise. Shown by its own name
+  // instead, so the row tells the truth and can be changed.
+  const roleOptions = useMemo(
+    () => [...new Set([...roles, ...people.map((person) => person.role).filter(Boolean)])],
+    [roles, people]
+  );
+
   const needle = search.trim().toLowerCase();
   const rows = useMemo(
     () => (needle ? people.filter((p) => p.employeeNo.toLowerCase().includes(needle)) : people),
@@ -166,7 +177,7 @@ export default function EmployeeRolesTable() {
                       onChange={(e) => setRole(person.employeeNo, e.target.value, person.note)}
                     >
                       <option value="">{t("roleNone")}</option>
-                      {roles.map((role) => (
+                      {roleOptions.map((role) => (
                         <option key={role} value={role}>
                           {t(`role.${role}`)}
                         </option>

@@ -64,7 +64,6 @@ export default function DashboardLayout({ children }) {
   const [ordersMaterialsOpen, setOrdersMaterialsOpen] = useState(() =>
     pathname.startsWith(ORDERS_MATERIALS_BASE_PATH)
   );
-  const [ordersWmsOpen, setOrdersWmsOpen] = useState(() => pathname.startsWith(ORDERS_WMS_BASE_PATH));
   const [recentPaths, setRecentPaths] = useLocalStorage(RECENT_PAGES_KEY, []);
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState(null);
@@ -204,8 +203,6 @@ export default function DashboardLayout({ children }) {
     { href: "/dashboard/orders/materials", label: tNav("ordersMaterialsSearch") },
     { href: "/dashboard/orders/materials/production-progress", label: tNav("ordersMaterialsProductionProgress") },
   ];
-
-  const ordersWmsChildren = [{ href: "/dashboard/orders/wms", label: tNav("ordersWmsLists") }];
 
   return (
     // h-dvh, not h-screen: on a phone h-screen is the *largest* viewport
@@ -370,16 +367,17 @@ export default function DashboardLayout({ children }) {
               items={ordersMaterialsChildren}
             />
 
-            <NavGroup
-              icon={PackageMinus}
-              label={tNav("ordersWms")}
-              basePath={ORDERS_WMS_BASE_PATH}
-              pathname={pathname}
-              collapsed={iconsOnly}
-              open={ordersWmsOpen}
-              onToggle={() => setOrdersWmsOpen((prev) => !prev)}
-              items={ordersWmsChildren}
-            />
+            {/* Flat: the section is one screen - the lists and the button
+                that starts one - so an expandable group with a single child
+                named after the group was a click in the way. */}
+            <Link
+              href={ORDERS_WMS_BASE_PATH}
+              title={iconsOnly ? tNav("ordersWms") : undefined}
+              className={navLinkClasses(pathname.startsWith(ORDERS_WMS_BASE_PATH), iconsOnly)}
+            >
+              <PackageMinus className="h-5 w-5 shrink-0" />
+              {!iconsOnly && tNav("ordersWms")}
+            </Link>
 
             {/* Flat, like Start: roles are not a section of anything - they
                 are about people, and every other group here is about a kind

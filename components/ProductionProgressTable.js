@@ -10,9 +10,13 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
-import { Columns3 } from "lucide-react";
+import { Columns3, Download } from "lucide-react";
 import { fetchProductionProgress } from "@/lib/productionProgressApi";
 import ProductionProgressGrid, { newProgressRow, progressRowsToText } from "@/components/ProductionProgressGrid";
+import BigbagWeights from "@/components/BigbagWeights";
+import { readStoredBigbagWeights, storeBigbagWeights, bigbagCoverage } from "@/lib/bigbagWeights";
+import { downloadProductionProgress } from "@/lib/productionProgressExport";
+import { lineMaterials } from "@/lib/lineMaterials";
 
 // "Zamówienia → Postęp produkcji": the planners' list of what runs on which
 // production line, pasted in, answered per position with the length of the
@@ -26,19 +30,69 @@ import ProductionProgressGrid, { newProgressRow, progressRowsToText } from "@/co
 // list is kept and read in: the question being asked is "what is left on
 // ST03", not "what is left on position 544069".
 
+// Where the typed-in package sizes are remembered. Per browser on
+// purpose - one person's note about the rolls and bags currently on the
+// shelf. Every read and write is guarded: a private window, blocked site
+// data or a half-written value must cost the default size, never the
+// screen.
+const SIZES_KEY = "wps.productionProgress.packageSizes";
+
+function readStoredPackageSizes() {
+  try {
+    const raw = window.localStorage.getItem(SIZES_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") return {};
+    // Only usable numbers survive the trip back, same rule as wpsApi's own
+    // sanitisePackageSizes - the API drops the rest anyway, this just keeps
+    // the inputs from showing a value that will not be used.
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, size]) => Number.isFinite(Number(size)) && Number(size) > 0)
+    );
+  } catch {
+    return {};
+  }
+}
+
+function storePackageSizes(sizes) {
+  try {
+    window.localStorage.setItem(SIZES_KEY, JSON.stringify(sizes));
+  } catch {
+    // Nothing to do and nothing worth saying: the size still applies to
+    // this result, it just will not be remembered for next time.
+  }
+}
+
 const HEAD_CLS = "text-[11px] font-medium tracking-wide text-gray-400 dark:text-neutral-500";
 const CELL_CLS = "text-gray-600 dark:text-neutral-300";
 const NUM_CLS = "text-right tabular-nums";
 
 // What a material group is called on the floor. The API keys are internal
 // ("jacket" covers both PE and LSZH, which is one job done by two
-// compounds); these are the names people actually use, and they read the
-// same in both languages so they are not translations.
-const MATERIAL_LABELS = { frp: "FRP", jacket: "PE / LSZH" };
+// compounds, and "tube" the PBT the tubes are extruded from); these are the
+// names people actually use, and they read the same in both languages so
+// they are not translations.
+const MATERIAL_LABELS = { frp: "FRP", tube: "PBTP", jacket: "PE / LSZH" };
 // The order material groups are listed in, inside a stage cell - the same
 // order the API sends them in.
-const MATERIAL_GROUP_ORDER = ["frp", "jacket"];
+const MATERIAL_GROUP_ORDER = ["frp", "tube", "jacket"];
+
+// The groups that come in countable packages, and the word for one: FRP on
+// rolls, jacket compound in bigbags. The API decides how many (packagesForDay
+// in wpsApi's productionProgress.js - a day's capacity per line, and a
+// package two parallel machines cannot share); this only names them. A group
+// the API counts nothing for simply has no panel.
+// `weights` is the one difference beyond the wording: a bigbag is weighed and
+// no two come out the same, so that panel also takes the weights of the bags
+// on the floor and says how many of *those* the day takes (see
+// components/BigbagWeights.js). A roll is sold by the length printed on it,
+// so there is nothing to weigh there.
+const PACKAGE_PANELS = [
+  { key: "frp", heading: "frpForDay", count: "rolls" },
+  { key: "tube", heading: "tubeForDay", count: "bigbags", weights: true },
+  { key: "jacket", heading: "jacketForDay", count: "bigbags", weights: true },
+];
 const materialLabel = (key) => MATERIAL_LABELS[key] ?? key.toUpperCase();
+
 
 const kmFormat = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 });
 const pctFormat = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 1 });
@@ -69,8 +123,20 @@ function Bar({ percent }) {
 // A stage with nothing left shows a plain 0 in green: on a screen read for
 // what is still to do, "0" is the answer, and the colour is what makes it
 // findable at a glance.
-function ProcessCell({ figures, showPerKm, t }) {
-  if (!figures) return <span className="text-gray-400 dark:text-neutral-500">—</span>;
+function ProcessCell({ figures, materials, showPerKm, t }) {
+  const items = materials ?? figures?.materials;
+  if (!figures) {
+    // CIP reports nothing on this stage. The materials are still what has
+    // to reach the line, so the plain view keeps them instead of printing a
+    // bare dash - the other half of why FRP could go missing there.
+    if (!items) return <span className="text-gray-400 dark:text-neutral-500">—</span>;
+    return (
+      <div className="min-w-[72px]">
+        <span className="text-gray-400 dark:text-neutral-500">—</span>
+        <StageMaterials materials={items} showPerKm={showPerKm} />
+      </div>
+    );
+  }
 
   const done = figures.remaining === 0;
   return (
@@ -101,8 +167,12 @@ function ProcessCell({ figures, showPerKm, t }) {
           They sit inside the stage rather than in a column of their own
           because that is where the work is: FRP goes in at stranding, the
           jacket at sheathing, and the amounts differ by how far each stage
-          has got. */}
-      <StageMaterials materials={figures.materials} showPerKm={showPerKm} />
+          has got.
+
+          `materials` overrides that for the plain view, which shows one
+          stage per line and would otherwise hide every material filed
+          under a different one - see the lineProcess cell. */}
+      <StageMaterials materials={items} showPerKm={showPerKm} />
     </div>
   );
 }
@@ -136,6 +206,123 @@ function StageMaterials({ materials, showPerKm }) {
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// How much one roll/bigbag of this material holds. Uncommitted while it is
+// being typed and sent on blur or Enter, because committing means another
+// request (the API does the counting - see wpsApi's PACKAGE_RULES). Keyed by
+// the size the answer came back with, so when a recount echoes a different
+// one the field follows it instead of keeping a stale edit.
+function PackageSizeInput({ item, onCommit, t }) {
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <input
+        key={`${item.itemNo}:${item.packageSize}`}
+        type="text"
+        inputMode="decimal"
+        defaultValue={item.packageSize}
+        aria-label={`${t("packageSize")} - ${item.name}`}
+        title={t("packageSize")}
+        onBlur={(event) => onCommit(item.itemNo, event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+        className="w-16 rounded-md border border-gray-200 bg-transparent px-1.5 py-0.5 text-right text-[11px] tabular-nums text-gray-600 focus:border-navy-700 focus:outline-none dark:border-neutral-700 dark:text-neutral-300 dark:focus:border-navy-400"
+      />
+      <span className="text-[10px] text-gray-400 dark:text-neutral-500">{`${item.unit}/${t("perPackage")}`}</span>
+    </span>
+  );
+}
+
+// On how many production lines the day needs this material, with their
+// names on hover. The API's own count (`lineCount`), not `lines.length`:
+// what counts as needing it is its rule.
+//
+// Picked out in colour from two upwards, for the reason `OrderLines` is:
+// "this one goes to four machines" is a different morning to plan than the
+// same kilograms on one, whether or not it is also more packages - a
+// pooled bigbag is one count for the day and can still have to be carried
+// to four places.
+function MaterialLines({ item, t }) {
+  const count = item.lineCount ?? item.lines?.length ?? 0;
+  if (!count) return null;
+  const several = count > 1;
+  return (
+    <span
+      title={(item.lines ?? []).map((line) => line.line).join(", ")}
+      className={`text-[11px] tabular-nums ${
+        several ? "font-medium text-navy-700 dark:text-navy-300" : "font-normal text-gray-400 dark:text-neutral-500"
+      }`}
+    >
+      {t("onLines", { count })}
+    </span>
+  );
+}
+
+/**
+ * One material on a package panel: how many packages the day takes of it, how
+ * much that is, on how many lines it is needed, what one kilometre of cable
+ * takes - and, for a bigbag, the weights of the bags on the floor.
+ *
+ * Exported because it is the whole of what those panels are, and a panel with
+ * fixture data is the only way to look at this part of the screen without a
+ * real production list and a CIP session behind it.
+ */
+export function PackageItemRow({ item, countKey, weighable, weights, onWeightsChange, onSizeCommit, t }) {
+  // Where the bags have been weighed, the count that leads is the one made of
+  // **those** bags: a 1250 kg bag and a 480 kg bag are not two of anything,
+  // and it is bags that get carried. The API's nominal count stays beside it
+  // whenever the two differ, so neither figure is a surprise. Bags short of
+  // the day are the one case the weights cannot answer - nobody has weighed
+  // the ones still to come - so there the nominal count leads.
+  const list = weights ?? [];
+  const cover = list.length > 0 ? bigbagCoverage(list, item.needed) : null;
+  const byWeight = cover?.enough ? cover.used : null;
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span className="text-lg font-semibold tabular-nums text-navy-950 dark:text-white">
+        {t(countKey, { count: byWeight ?? item.packages })}
+      </span>
+      {byWeight !== null && byWeight !== item.packages && (
+        <span className="text-[11px] tabular-nums text-gray-400 dark:text-neutral-500">
+          {t("weights.nominally", { bags: t(countKey, { count: item.packages }) })}
+        </span>
+      )}
+      <span className="text-sm text-gray-600 dark:text-neutral-300">{item.name}</span>
+      <MaterialLines item={item} t={t} />
+      <span className="text-xs tabular-nums text-gray-500 dark:text-neutral-400">
+        {kmFormat.format(item.needed)} {item.unit}
+      </span>
+      {/* What one kilometre of cable takes of it - the figure you multiply by
+          to plan, as against the day's amount, which is only this shift's.
+          The API's own and weighted by the cable it came from: the same
+          compound runs at a different rate under every cable. */}
+      {item.perKm !== null && item.perKm !== undefined && (
+        <span className="text-[11px] tabular-nums text-gray-500 dark:text-neutral-400">
+          {`${perKmFormat.format(item.perKm)} ${item.unit}/km`}
+        </span>
+      )}
+      {/* How much this one holds. Bags and rolls differ per material and only
+          the people on the floor know which is which, so it is typed in here
+          rather than assumed - the API keeps the default and does the counting
+          either way. */}
+      <PackageSizeInput item={item} onCommit={onSizeCommit} t={t} />
+      {/* Per line. A roll cannot leave its machine, so each line's own count
+          is the useful figure; a bigbag serves whatever asks for it, so there
+          the count is one for the day and only the amounts are per line. */}
+      <span className="text-[11px] text-gray-400 dark:text-neutral-500">
+        {item.lines
+          .map((l) =>
+            item.pooled
+              ? `${l.line}: ${kmFormat.format(l.needed)} ${item.unit}`
+              : `${l.line}: ${t(countKey, { count: l.packages })}`
+          )
+          .join(" · ")}
+      </span>
+      {weighable && <BigbagWeights item={item} weights={list} onChange={onWeightsChange} t={t} />}
     </div>
   );
 }
@@ -301,6 +488,20 @@ const INITIAL_ROWS = 3;
 export default function ProductionProgressTable() {
   const t = useTranslations("productionProgress");
   const [rows, setRows] = useState(() => Array.from({ length: INITIAL_ROWS }, newProgressRow));
+  // How much one roll/bigbag of a given material holds, where it differs
+  // from wpsApi's own default - `{ "<itemNo>": <number> }`, typed in on the
+  // package panels below. Remembered in this browser only: it is a note to
+  // self about the stock on the shelf, not a plant-wide setting, and the
+  // counting itself happens server-side either way (see PACKAGE_RULES).
+  const [packageSizes, setPackageSizes] = useState(readStoredPackageSizes);
+  // The weights of the bigbags standing on the floor, per material
+  // (`{ "<itemNo>": [1012, 987, ...] }`), likewise remembered in this browser
+  // only. Nothing is sent: the API counts the day at the nominal size, and
+  // these answer the other question - how many of the bags I actually have
+  // that is (see components/BigbagWeights.js).
+  const [bagWeights, setBagWeights] = useState(readStoredBigbagWeights);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const [result, setResult] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | checking | ready | error
   const [error, setError] = useState("");
@@ -321,14 +522,14 @@ export default function ProductionProgressTable() {
 
   const filled = rows.some((row) => String(row.number ?? "").trim());
 
-  async function check() {
+  async function check(sizes = packageSizes) {
     if (!filled || status === "checking") return;
     setStatus("checking");
     setError("");
     try {
       // The grid is serialised to the two-column text the API already
       // parses, so there is one parser for every way this screen is filled.
-      const data = await fetchProductionProgress(progressRowsToText(rows));
+      const data = await fetchProductionProgress(progressRowsToText(rows), sizes);
       setResult(data);
       setStatus("ready");
     } catch (err) {
@@ -337,8 +538,56 @@ export default function ProductionProgressTable() {
     }
   }
 
+  // A package size is committed on blur/Enter, not per keystroke: the count
+  // comes back from the API, so every change is a request, and re-asking CIP
+  // on each digit of "1250" would be four.
+  function setPackageSize(itemNo, raw) {
+    const size = Number(String(raw).replace(",", "."));
+    const next = { ...packageSizes };
+    if (Number.isFinite(size) && size > 0) next[itemNo] = size;
+    else delete next[itemNo];
+    if (JSON.stringify(next) === JSON.stringify(packageSizes)) return;
+    setPackageSizes(next);
+    storePackageSizes(next);
+    // Recount with it straight away - a size nobody sees applied is a size
+    // nobody trusts. Same request the "Sprawdź" button makes.
+    if (result) check(next);
+  }
+
+  // A weight list, unlike a package size, costs no request: the counting from
+  // weights happens here, so it is applied as it is typed.
+  //
+  // `change` is a function of that item's current list (see BigbagWeights for
+  // the blur-then-click case it exists for), so the write is against the
+  // latest state and not the render the handler was created in. Persisting
+  // from inside the updater is deliberate: it writes the same JSON if React
+  // runs it twice, and anything else would store a list one keystroke old.
+  function setBigbagWeights(itemNo, change) {
+    setBagWeights((current) => {
+      const list = typeof change === "function" ? change(current[itemNo] ?? []) : change;
+      const next = { ...current };
+      if (list.length > 0) next[itemNo] = list;
+      else delete next[itemNo];
+      storeBigbagWeights(next);
+      return next;
+    });
+  }
+
+  async function exportXlsx() {
+    setExportError("");
+    setExporting(true);
+    try {
+      await downloadProductionProgress({ groups, t });
+    } catch (err) {
+      setExportError(err?.message || t("export.error"));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   function clear() {
     setRows(Array.from({ length: INITIAL_ROWS }, newProgressRow));
+    setExportError("");
     setResult(null);
     setStatus("idle");
     setError("");
@@ -371,11 +620,11 @@ export default function ProductionProgressTable() {
 
   const total = useMemo(() => (result?.rows ? summarise(result.rows, result.processKeys ?? []) : null), [result]);
 
-  // How many spools of each FRP have to be out on the lines at once.
-  // What a day's run takes of each FRP and how many rolls that is - worked
-  // out by the API, which owns the rule (a day's capacity per line, and a
-  // roll that cannot be shared between parallel machines).
-  const frpRolls = result?.frpRolls ?? [];
+  // What a day's run takes of each FRP and each jacket compound, and how
+  // many rolls / bigbags that is - worked out by the API, which owns the
+  // rule (a day's capacity per line, and a package that cannot be shared
+  // between parallel machines).
+  const packages = result?.packages ?? {};
 
   // Which production lines each order is run on, across the whole result.
   // One order genuinely goes to several (a real list had one on ST01, ST02,
@@ -436,29 +685,41 @@ export default function ProductionProgressTable() {
             />
           </div>
 
-          {frpRolls.length > 0 && (
-            <div className="mt-6 rounded-xl border border-gray-200 px-4 py-3 dark:border-neutral-700">
-              <p className={`${HEAD_CLS} uppercase`}>{t("frpForDay")}</p>
-              <div className="mt-2 space-y-2">
-                {frpRolls.map((item) => (
-                  <div key={item.itemNo} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="text-lg font-semibold tabular-nums text-navy-950 dark:text-white">
-                      {t("rolls", { count: item.rolls })}
-                    </span>
-                    <span className="text-sm text-gray-600 dark:text-neutral-300">{item.name}</span>
-                    <span className="text-xs tabular-nums text-gray-500 dark:text-neutral-400">
-                      {kmFormat.format(item.needed)} {item.unit}
-                    </span>
-                    {/* Per line, because the rolls are counted per line -
-                        two machines cannot share one. */}
-                    <span className="text-[11px] text-gray-400 dark:text-neutral-500">
-                      {item.lines.map((l) => `${l.line}: ${t("rolls", { count: l.rolls })}`).join(" · ")}
-                    </span>
-                  </div>
-                ))}
+          {PACKAGE_PANELS.map(({ key, heading, count, weights }) => {
+            const items = packages[key] ?? [];
+            if (items.length === 0) return null;
+            return (
+              <div
+                key={key}
+                className="mt-6 rounded-xl border border-gray-200 px-4 py-3 dark:border-neutral-700"
+              >
+                <p className={`${HEAD_CLS} uppercase`}>
+                  {t(heading)}
+                  {/* What the counts rest on, from the API rather than from a
+                      second copy of the figure here: a day is one line's
+                      capacity, so a 150 km order is counted for the day in
+                      front of it and counted again tomorrow. */}
+                  {result?.dailyKm && (
+                    <span className="ml-2 normal-case">{t("perDay", { km: kmFormat.format(result.dailyKm) })}</span>
+                  )}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {items.map((item) => (
+                    <PackageItemRow
+                      key={item.itemNo}
+                      item={item}
+                      countKey={count}
+                      weighable={Boolean(weights)}
+                      weights={bagWeights[item.itemNo]}
+                      onWeightsChange={setBigbagWeights}
+                      onSizeCommit={setPackageSize}
+                      t={t}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1 rounded-lg border border-gray-200 p-1 dark:border-neutral-700">
@@ -476,6 +737,15 @@ export default function ProductionProgressTable() {
                 </Button>
               ))}
             </div>
+
+            <div className="flex items-center gap-3">
+            {/* One sheet per production line: the list is carried out to the
+                floor line by line, and a line's sheet is its orders, what is
+                left of each and the FRP and compound each takes. */}
+            <Button variant="outline" size="sm" onClick={exportXlsx} disabled={exporting}>
+              <Download className="h-4 w-4" />
+              {exporting ? t("export.exporting") : t("export.button")}
+            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -505,7 +775,10 @@ export default function ProductionProgressTable() {
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
+
+          {exportError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{exportError}</p>}
 
           <div className="mt-3 overflow-x-auto">
             <Table>
@@ -701,8 +974,21 @@ function PositionCell({ column, row, orderLines, t }) {
             {row.lineProcess.toUpperCase()}
           </div>
           {/* Only here: the plain view is the one read while planning what
-              to send, so it carries the per-kilometre figure too. */}
-          <ProcessCell figures={row.processes?.[row.lineProcess]} showPerKm t={t} />
+              to send, so it carries the per-kilometre figure too.
+
+              And the materials are **the kinds this line's own stage puts
+              into the cable** (the API's `lineMaterialKeys`), not the ones
+              CIP files under the stage: FRP's BOM rows say "SC" while an ST
+              line's own stage is "SZ", so reading the stage's own list left
+              the FRP off exactly the lines that run it - and reading the
+              whole BOM instead sent FRP to a sheathing line, which puts no
+              FRP in at all. */}
+          <ProcessCell
+            figures={row.processes?.[row.lineProcess]}
+            materials={lineMaterials(row)}
+            showPerKm
+            t={t}
+          />
         </div>
       );
     }

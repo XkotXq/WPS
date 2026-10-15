@@ -1,11 +1,11 @@
 import { getTranslations } from "next-intl/server";
-import { ensureFreshCipSession } from "@/lib/cipSession";
+import { cipSessionOrLogin } from "@/lib/cipSession";
 import { loadCipInventory } from "@/lib/cipInventory";
 import CipMaterialsTable from "@/components/CipMaterialsTable";
 
 export default async function MaterialsListPage() {
   const t = await getTranslations("materialsList");
-  const session = await ensureFreshCipSession();
+  const session = await cipSessionOrLogin();
   const { records, error } = await loadCipInventory(session);
 
   return (

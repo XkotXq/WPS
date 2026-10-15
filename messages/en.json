@@ -27,16 +27,15 @@
     "materialsListSm": "SM Materials List",
     "materialsHistorySm": "SM Operation History",
     "materialsCatalogSm": "SM Materials Catalog",
-    "ordersTransport": "Transports",
-    "ordersTransportList": "Transport list",
-    "ordersTransportGuidelines": "Transport guidelines",
-    "ordersTransportHistory": "Transport history",
+    "ordersTransport": "Tasks",
+    "ordersTransportList": "Task list",
+    "ordersTransportGuidelines": "Task guidelines",
+    "ordersTransportHistory": "Task history",
     "ordersTransportLoginHistory": "Login history",
     "ordersMaterials": "Orders",
     "ordersMaterialsSearch": "Order search",
     "ordersMaterialsProductionProgress": "Production progress",
     "ordersWms": "WMS Issues",
-    "ordersWmsLists": "Issue lists",
     "search": "Search",
     "searchPlaceholder": "Search...",
     "collapse": "Collapse navigation",
@@ -132,6 +131,11 @@
       "historyLocation": "Location",
       "historyOperator": "Handled by",
       "historyTime": "Date & time",
+      "wmsListNo": "List number",
+      "wmsCreatedAt": "Created",
+      "wmsPositions": "Positions",
+      "wmsStatus": "Status",
+      "wmsCreatedBy": "Created by",
       "status": "Status",
       "yes": "Yes",
       "no": "No"
@@ -282,13 +286,13 @@
     }
   },
   "ordersTransport": {
-    "title": "Transport list",
-    "subtitle": "Transports requested to the main warehouse.",
+    "title": "Task list",
+    "subtitle": "Tasks requested to the main warehouse.",
     "count": "Items: {count}",
-    "emptyStatus": "No transports match the search.",
-    "newOrder": "New transport",
+    "emptyStatus": "No tasks match the search.",
+    "newOrder": "New task",
     "loading": "Loading...",
-    "loadError": "Failed to load the transport list.",
+    "loadError": "Failed to load the task list.",
     "actions": {
       "take": "Take",
       "complete": "Complete",
@@ -322,7 +326,7 @@
       "cards": "Cards"
     },
     "columns": {
-      "orderNo": "Transport number",
+      "orderNo": "Task number",
       "type": "Type",
       "status": "Status",
       "line": "Line",
@@ -341,7 +345,7 @@
       "problem": "Problem"
     },
     "newOrderPanel": {
-      "titleFor": "New transport: {type}",
+      "titleFor": "New task: {type}",
       "fields": {
         "to": "Deliver to",
         "toShort": "To",
@@ -369,7 +373,7 @@
       "noMatches": "No matches",
       "removeRow": "Remove row",
       "cancel": "Cancel",
-      "save": "Place transport",
+      "save": "Place task",
       "orderSpoolsLabel": "Spools on order {orderNo}"
     },
     "photoOpenOriginal": "Open the original",
@@ -386,7 +390,7 @@
     }
   },
   "ordersTransportGuidelines": {
-    "title": "Transport guidelines",
+    "title": "Task guidelines",
     "lineLabel": "Line",
     "linesSelected": "(selected: {count})",
     "materialLabel": "Material (optional)",
@@ -411,12 +415,12 @@
     "allMaterials": "All materials",
     "materialsSelected": "({count} selected)",
     "materialRemove": "Remove material",
-    "typeLabel": "Transport type",
+    "typeLabel": "Task type",
     "anyType": "Any type",
     "allLines": "All lines"
   },
   "ordersTransportHistory": {
-    "title": "Transport history"
+    "title": "Task history"
   },
   "ordersTransportLoginHistory": {
     "title": "Login history",
@@ -484,7 +488,49 @@
   },
   "ordersWms": {
     "title": "WMS Issues",
-    "subtitle": "Issues created in WMS will be shown here. This section is coming soon."
+    "newList": "New list",
+    "refresh": "Refresh",
+    "cancel": "Cancel",
+    "wmsSignIn": "Sign in to WMS",
+    "wmsSignOut": "Sign out of WMS",
+    "wmsSignedInAs": "WMS: {user}",
+    "wmsNotSignedIn": "WMS: not signed in",
+    "wmsSignInTitle": "WMS sign-in",
+    "wmsSignInUser": "WMS user",
+    "wmsSignInPassword": "WMS password",
+    "wmsSignInPending": "Signing in…",
+    "wmsSignInMissing": "Enter your WMS user and password.",
+    "form": {
+      "title": "New issue list",
+      "organization": "Organization",
+      "sourceOrganization": "Source organization",
+      "documentClass": "Document class",
+      "billDate": "Bill date",
+      "sourceWarehouse": "Source warehouse",
+      "destinationWarehouse": "Destination warehouse",
+      "pickingRule": "Picking rule",
+      "remark": "Remark",
+      "positions": "Positions",
+      "positionCount": "{count} pos.",
+      "lookupPending": "Fetching from WMS…",
+      "optionsLoading": "Loading…",
+      "optionsEmpty": "No options",
+      "missingHeader": "Fill in the organization, date and both warehouses.",
+      "noPositions": "Add at least one position.",
+      "badPositions": "Fix the highlighted positions.",
+      "save": "Save in WMS",
+      "saving": "Saving in WMS…"
+    },
+    "grid": {
+      "itemNo": "Item no.",
+      "itemName": "Name",
+      "spec": "Specification",
+      "unit": "Unit",
+      "location": "Location",
+      "quantity": "Quantity",
+      "addRow": "+ Add row",
+      "removeSelected": "Remove selected ({count})"
+    }
   },
   "materialsListSm": {
     "title": "SM Materials List",
@@ -621,9 +667,9 @@
     "loading": "Loading…",
     "fetchError": "Failed to fetch the history from the API.",
     "count": "Items: {count}",
-    "operationIn": "Receipt",
-    "operationOut": "Issue",
-    "operationLabeling": "Labeling",
+    "operationIn": "In",
+    "operationOut": "Out",
+    "operationLabeling": "Edit",
     "empty": "No operations recorded yet. Receipts and issues from SM Materials will show up here.",
     "prevPage": "Previous",
     "nextPage": "Next",
@@ -762,7 +808,8 @@
       "supervisor": "Supervisor",
       "orderer": "Orderer",
       "forklift": "Forklift operator",
-      "warehouse": "Warehouse operator"
+      "warehouse": "Warehouse operator",
+      "test": "Test"
     }
   },
   "shortLengths": {
@@ -799,8 +846,14 @@
     "notFound": "Not found in CIP",
     "finished": "Finished",
     "unfinished": "unfinished",
-    "frpForDay": "FRP for today",
+    "frpForDay": "FRP for the day",
+    "perDay": "{km} km per line",
+    "tubeForDay": "PBTP for the day",
+    "jacketForDay": "PE / LSZH for the day",
+    "packageSize": "Per package",
+    "perPackage": "pack",
     "rolls": "{count, plural, =1 {1 roll} other {# rolls}}",
+    "bigbags": "{count, plural, =1 {1 bigbag} other {# bigbags}}",
     "onLines": "{count, plural, =1 {1 line} other {# lines}}",
     "noMaterial": "none",
     "processOf": "of {total}",
@@ -817,6 +870,31 @@
       "orderNumber": "Order number",
       "process": "Process",
       "total": "Total (km)"
+    },
+    "weights": {
+      "open": "Bigbag weights",
+      "title": "Bigbag weights",
+      "one": "Weight",
+      "add": "Add a bigbag weight",
+      "remove": "Remove bigbag",
+      "close": "Collapse",
+      "clear": "Clear",
+      "none": "Nothing weighed",
+      "enough": "For the shift: {bags} · {surplus} spare",
+      "weighed": "weighed: {bags} · {weight}",
+      "short": "{short} short",
+      "nominally": "nominally {bags}"
+    },
+    "export": {
+      "button": "Export",
+      "exporting": "Exporting…",
+      "error": "Export failed.",
+      "title": "Production progress",
+      "columns": {
+        "orderNumber": "Order number",
+        "remaining": "Remaining (km)",
+        "materials": "Materials"
+      }
     }
   }
 }

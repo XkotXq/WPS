@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { ensureFreshCipSession } from "@/lib/cipSession";
+import { cipSessionOrLogin } from "@/lib/cipSession";
 import CipMaterialsHistoryTable from "@/components/CipMaterialsHistoryTable";
 
 const CIP_HISTORY_URL = "http://10.96.9.2/wms/materialTemporaryStorageWarehouseHistory/query/page";
@@ -46,14 +46,12 @@ async function loadHistory(token, page, filters) {
 export default async function MaterialsHistoryPage({ searchParams }) {
   const params = await searchParams;
   const t = await getTranslations("materialsHistory");
-  const session = await ensureFreshCipSession();
+  const session = await cipSessionOrLogin();
   const requestedPage = Math.max(1, Number.parseInt(params?.page, 10) || 1);
   const filters = Object.fromEntries(
     FILTER_KEYS.map((key) => [key, String(params?.[key] ?? "").trim()]).filter(([, value]) => value !== "")
   );
-  const { records, totalPages, total, error } = session
-    ? await loadHistory(session.token, requestedPage, filters)
-    : { records: [], totalPages: 1, total: 0, error: true };
+  const { records, totalPages, total, error } = await loadHistory(session.token, requestedPage, filters);
   const currentPage = Math.min(requestedPage, Math.max(totalPages, 1));
 
   return (

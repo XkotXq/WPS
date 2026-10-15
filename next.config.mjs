@@ -15,7 +15,23 @@ const nextConfig = {
   // opened via the network IP loads its HTML fine but the client bundle
   // never runs, which is why login (a client-side redirect after the
   // server accepts it) looked like it just did nothing.
-  allowedDevOrigins: ["10.96.12.204"],
+  //
+  // **Every private address, not this machine's own IP.** It was one
+  // hardcoded address, which stops being this machine the next time DHCP
+  // hands out another one and was never right on anybody else's computer.
+  // Next matches these per dot-separated segment, so "10.*.*.*" is exactly
+  // the 10/8 block (see next/dist/server/app-render/csrf-protection.js);
+  // this is a dev-server CSRF allowlist on a LAN, and none of these
+  // addresses is routable from outside it. DEV_ORIGINS adds a hostname
+  // (comma-separated) for a setup that reaches the dev server by name.
+  allowedDevOrigins: [
+    "10.*.*.*",
+    "192.168.*.*",
+    // 172.16/12 - the private part of 172, which is also where Docker and
+    // WSL put their own bridges on this machine.
+    ...Array.from({ length: 16 }, (_, i) => `172.${16 + i}.*.*`),
+    ...(process.env.DEV_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+  ],
 };
 
 export default withNextIntl(nextConfig);
